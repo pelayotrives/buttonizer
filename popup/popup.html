@@ -1,2 +1,59 @@
 <!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Buttonizer</title>
+  <link rel="stylesheet" href="./popup.css">
+</head>
+
+<body>
+  <main class="app">
+    <section class="hero panel">
+      <div>
+        <p class="eyebrow">PRIVATE BUTTON LIBRARY</p>
+        <h1>Buttonizer</h1>
+        <p class="hero-copy">Capture buttons from the current page, inspect their styling, and keep a local swipe file you can revisit anytime.</p>
+      </div>
+      <div class="hero-actions">
+        <button id="scanButton" class="primary-btn" type="button">Scan current page</button>
+        <button id="saveAllButton" class="secondary-btn hidden" type="button">Save all found</button>
+      </div>
+      <p id="statusMessage" class="status-message hidden" aria-live="polite"></p>
+    </section>
+
+    <section class="panel compact-panel">
+      <div class="panel-heading compact-heading">
+        <p class="panel-title">Current page</p>
+        <p id="pageMeta" class="panel-copy">No scan yet.</p>
+      </div>
+    </section>
+
+    <section class="panel detected-panel">
+      <div class="section-head">
+        <div class="panel-heading compact-heading">
+          <p class="panel-title">Detected buttons</p>
+          <p class="panel-copy">Visible buttons found in the active tab.</p>
+        </div>
+        <span id="detectedCount" class="count-badge">0</span>
+      </div>
+      <div id="detectedList" class="card-list empty-state">Scan a page to inspect its buttons.</div>
+    </section>
+
+    <section class="panel library-panel">
+      <div class="section-head">
+        <div class="panel-heading compact-heading">
+          <p class="panel-title">Saved library</p>
+          <p class="panel-copy">Your private local collection of captured button styles.</p>
+        </div>
+        <button id="clearLibraryButton" class="ghost-btn hidden" type="button">Clear library</button>
+      </div>
+      <div id="savedList" class="card-list empty-state">No saved buttons yet.</div>
+    </section>
+  </main>
+
+  <script src="./popup.js"></script>
+</body>
+
 </html>
