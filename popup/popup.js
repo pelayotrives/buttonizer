@@ -18,6 +18,7 @@ const elements = {
   capturePrevButton: document.getElementById("capturePrevButton"),
   captureNextButton: document.getElementById("captureNextButton"),
   removeSavedButton: document.getElementById("removeSavedButton"),
+  copyMarkupButton: document.getElementById("copyMarkupButton"),
   statusMessage: document.getElementById("statusMessage"),
   scanCountBadge: document.getElementById("scanCountBadge"),
   pageFacts: document.getElementById("pageFacts"),
@@ -67,6 +68,7 @@ function bindEvents() {
   elements.capturePrevButton.addEventListener("click", () => moveDetected(-1));
   elements.captureNextButton.addEventListener("click", () => moveDetected(1));
   elements.removeSavedButton.addEventListener("click", handleRemoveSelectedSaved);
+  elements.copyMarkupButton.addEventListener("click", handleCopyMarkup);
 }
 
 async function loadSavedButtons() {
@@ -120,6 +122,7 @@ function renderCaptureInspector() {
   elements.detectedEmpty.hidden = count > 0;
   elements.detectedInspector.hidden = count === 0;
   elements.saveCurrentButton.disabled = count === 0;
+  elements.copyMarkupButton.disabled = count === 0;
 
   if (count === 0) {
     return;
@@ -339,6 +342,15 @@ async function handleClearLibrary() {
   setStatus("Archive cleared.", "Ready");
 }
 
+async function handleCopyMarkup() {
+  const value = elements.inspectorMarkup.textContent || "";
+  if (!value) {
+    return;
+  }
+
+  await copyText(value, "Markup copied.");
+}
+
 function applyPreviewStyle(node, styles) {
   node.style.fontFamily = styles.fontFamily || "Arial, sans-serif";
   node.style.fontSize = styles.fontSize || "14px";
@@ -368,12 +380,54 @@ function renderPalette(container, palette) {
   }
 
   uniqueColors.forEach((colorValue) => {
-    const swatch = document.createElement("span");
+    const swatch = document.createElement("button");
     swatch.className = "palette-swatch";
+    swatch.type = "button";
     swatch.style.background = colorValue;
-    swatch.title = colorValue;
+    swatch.title = `Copy ${colorValue}`;
+    swatch.setAttribute("aria-label", `Copy color ${colorValue}`);
+    swatch.addEventListener("click", async () => {
+      const hexValue = colorToHex(colorValue);
+      await copyText(hexValue, `${hexValue} copied.`);
+    });
     container.appendChild(swatch);
   });
+}
+
+async function copyText(value, successMessage) {
+  try {
+    await navigator.clipboard.writeText(value);
+    setStatus(successMessage, "Ready");
+  } catch (error) {
+    console.error(error);
+    setStatus("Copy failed.", "Error");
+  }
+}
+
+function colorToHex(colorValue) {
+  const sample = document.createElement("canvas").getContext("2d");
+  if (!sample) {
+    return colorValue;
+  }
+
+  sample.fillStyle = "#000000";
+  sample.fillStyle = colorValue;
+  const normalized = sample.fillStyle;
+
+  if (normalized.startsWith("#")) {
+    return normalized.toUpperCase();
+  }
+
+  const rgbMatch = normalized.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+  if (!rgbMatch) {
+    return colorValue;
+  }
+
+  const [, r, g, b] = rgbMatch;
+  return `#${[r, g, b]
+    .map((value) => Number(value).toString(16).padStart(2, "0"))
+    .join("")
+    .toUpperCase()}`;
 }
 
 function normalizeButtonRecord(item) {

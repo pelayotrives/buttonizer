@@ -11,7 +11,6 @@
       <section class="workspace-panel">
         <header class="workspace-panel__hero">
           <div class="workspace-panel__copy">
-            <p class="eyebrow">Buttonizer</p>
             <h1>Capture and keep useful buttons</h1>
             <p class="hero-copy">
               Scan the current page, isolate the button components you like, and keep them in your own private archive with their visual details.
@@ -42,14 +41,11 @@
 
         <section class="capture-panel">
           <div class="capture-panel__header">
-            <div>
-              <p class="section-label">Live capture</p>
-              <h2>Current button</h2>
-            </div>
+            <h2>Current button</h2>
             <div class="capture-nav">
-              <button id="capturePrevButton" class="nav-button" type="button" aria-label="Previous button">&#8249;</button>
+              <button id="capturePrevButton" class="nav-button" type="button" aria-label="Previous button">‹</button>
               <span id="scanCountBadge" class="counter-pill">0 found</span>
-              <button id="captureNextButton" class="nav-button" type="button" aria-label="Next button">&#8250;</button>
+              <button id="captureNextButton" class="nav-button" type="button" aria-label="Next button">›</button>
             </div>
           </div>
 
@@ -100,17 +96,24 @@
             </div>
 
             <div>
-              <p class="section-label">Palette</p>
+              <div class="section-row">
+                <p class="section-title">Palette</p>
+              </div>
               <div id="inspectorPalette" class="palette-row" aria-label="Extracted palette"></div>
             </div>
 
             <div class="snippet-block">
-              <p class="section-label">Selector</p>
+              <div class="section-row">
+                <p class="section-title">Selector</p>
+              </div>
               <p id="inspectorSelector" class="snippet-block__value snippet-block__value--selector"></p>
             </div>
 
             <div class="snippet-block">
-              <p class="section-label">Markup</p>
+              <div class="section-row">
+                <p class="section-title">Markup</p>
+                <button id="copyMarkupButton" class="icon-button" type="button" aria-label="Copy markup">⧉</button>
+              </div>
               <pre id="inspectorMarkup" class="snippet-block__value snippet-block__value--code"></pre>
             </div>
           </article>
@@ -119,10 +122,7 @@
 
       <section class="panel">
         <div class="panel-header">
-          <div>
-            <p class="section-label">Saved</p>
-            <h2>Archive</h2>
-          </div>
+          <h2>Archive</h2>
           <button id="clearLibraryButton" class="ui-button ui-button--ghost" type="button">Clear library</button>
         </div>
 
@@ -134,10 +134,7 @@
 
         <div id="savedDetails" class="saved-details" hidden>
           <div class="saved-details__header">
-            <div>
-              <p class="section-label">Saved details</p>
-              <h3 id="savedDetailsTitle"></h3>
-            </div>
+            <h3 id="savedDetailsTitle"></h3>
             <button id="removeSavedButton" class="ui-button ui-button--mini ui-button--secondary" type="button">Remove</button>
           </div>
           <div class="saved-details__meta">
