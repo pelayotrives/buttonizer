@@ -8,6 +8,8 @@
   </head>
   <body>
     <main class="app-shell">
+      <div id="toastMessage" class="toast" hidden aria-live="polite"></div>
+
       <section class="workspace-panel">
         <header class="workspace-panel__hero">
           <div class="workspace-panel__copy">
@@ -95,21 +97,21 @@
               </div>
             </div>
 
-            <div>
+            <div class="info-block">
               <div class="section-row">
                 <p class="section-title">Palette</p>
               </div>
               <div id="inspectorPalette" class="palette-row" aria-label="Extracted palette"></div>
             </div>
 
-            <div class="snippet-block">
+            <div class="info-block">
               <div class="section-row">
                 <p class="section-title">Selector</p>
               </div>
               <p id="inspectorSelector" class="snippet-block__value snippet-block__value--selector"></p>
             </div>
 
-            <div class="snippet-block">
+            <div class="info-block">
               <div class="section-row">
                 <p class="section-title">Markup</p>
                 <button id="copyMarkupButton" class="icon-button" type="button" aria-label="Copy markup">⧉</button>

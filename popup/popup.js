@@ -8,6 +8,7 @@ const state = {
   status: "Idle",
   detectedIndex: 0,
   selectedSavedId: null,
+  toastTimer: null,
 };
 
 const elements = {
@@ -20,6 +21,7 @@ const elements = {
   removeSavedButton: document.getElementById("removeSavedButton"),
   copyMarkupButton: document.getElementById("copyMarkupButton"),
   statusMessage: document.getElementById("statusMessage"),
+  toastMessage: document.getElementById("toastMessage"),
   scanCountBadge: document.getElementById("scanCountBadge"),
   pageFacts: document.getElementById("pageFacts"),
   detectedEmpty: document.getElementById("detectedEmpty"),
@@ -52,6 +54,7 @@ const elements = {
 bootstrap().catch((error) => {
   console.error(error);
   setStatus(error.message || "Buttonizer could not start.", "Error");
+  showToast("Buttonizer could not start.");
 });
 
 async function bootstrap() {
@@ -85,6 +88,19 @@ function setStatus(message, status) {
   state.status = status;
   elements.statusMessage.textContent = message;
   renderPageFacts();
+}
+
+function showToast(message) {
+  if (state.toastTimer) {
+    clearTimeout(state.toastTimer);
+  }
+
+  elements.toastMessage.textContent = message;
+  elements.toastMessage.hidden = false;
+  state.toastTimer = window.setTimeout(() => {
+    elements.toastMessage.hidden = true;
+    state.toastTimer = null;
+  }, 1800);
 }
 
 function renderAll() {
@@ -261,17 +277,18 @@ async function handleScanPage() {
     state.detectedIndex = 0;
 
     const count = state.detectedButtons.length;
-    setStatus(
+    const message =
       count === 0
         ? "Scan complete. No visible button-like components were detected."
-        : `Scan complete. ${count} button reference${count === 1 ? "" : "s"} captured.`,
-      "Ready"
-    );
+        : `Scan complete. ${count} button reference${count === 1 ? "" : "s"} captured.`;
 
+    setStatus(message, "Ready");
     renderAll();
+    showToast(count === 0 ? "Scan complete." : `${count} buttons captured.`);
   } catch (error) {
     console.error(error);
     setStatus(error.message || "Scan failed.", "Error");
+    showToast("Scan failed.");
   } finally {
     elements.scanPageButton.disabled = false;
   }
@@ -302,6 +319,7 @@ async function saveDetectedItems(items) {
 
   if (freshItems.length === 0) {
     setStatus("Those buttons are already stored in your archive.", "Error");
+    showToast("Already saved.");
     return;
   }
 
@@ -310,6 +328,7 @@ async function saveDetectedItems(items) {
   await persistSavedButtons();
   renderAll();
   setStatus(`Saved ${freshItems.length} button reference${freshItems.length === 1 ? "" : "s"}.`, "Ready");
+  showToast(freshItems.length === 1 ? "Button saved." : `${freshItems.length} buttons saved.`);
 }
 
 async function handleRemoveSelectedSaved() {
@@ -327,6 +346,7 @@ async function removeSavedItem(id) {
   await persistSavedButtons();
   renderAll();
   setStatus(`Removed "${target?.label || "button"}" from your archive.`, "Ready");
+  showToast("Saved button removed.");
 }
 
 async function handleClearLibrary() {
@@ -340,6 +360,7 @@ async function handleClearLibrary() {
   await persistSavedButtons();
   renderAll();
   setStatus("Archive cleared.", "Ready");
+  showToast("Archive cleared.");
 }
 
 async function handleCopyMarkup() {
@@ -398,21 +419,23 @@ async function copyText(value, successMessage) {
   try {
     await navigator.clipboard.writeText(value);
     setStatus(successMessage, "Ready");
+    showToast(successMessage);
   } catch (error) {
     console.error(error);
     setStatus("Copy failed.", "Error");
+    showToast("Copy failed.");
   }
 }
 
 function colorToHex(colorValue) {
-  const sample = document.createElement("canvas").getContext("2d");
-  if (!sample) {
+  const context = document.createElement("canvas").getContext("2d");
+  if (!context) {
     return colorValue;
   }
 
-  sample.fillStyle = "#000000";
-  sample.fillStyle = colorValue;
-  const normalized = sample.fillStyle;
+  context.fillStyle = "#000000";
+  context.fillStyle = colorValue;
+  const normalized = context.fillStyle;
 
   if (normalized.startsWith("#")) {
     return normalized.toUpperCase();
