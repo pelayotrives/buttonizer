@@ -1,409 +1,551 @@
-const storage_key = "buttonizer_saved_buttons";
+const STORAGE_KEY = "buttonizer_saved_buttons";
 
-const refs = {
-  scanButton: document.getElementById("scanButton"),
-  saveAllButton: document.getElementById("saveAllButton"),
-  clearLibraryButton: document.getElementById("clearLibraryButton"),
-  statusMessage: document.getElementById("statusMessage"),
-  pageMeta: document.getElementById("pageMeta"),
-  detectedCount: document.getElementById("detectedCount"),
-  detectedList: document.getElementById("detectedList"),
-  savedList: document.getElementById("savedList")
+const state = {
+  detectedButtons: [],
+  savedButtons: [],
+  pageTitle: "No page scanned yet",
+  pageUrl: "Run a scan to inspect visible buttons",
+  status: "Idle",
+  detectedIndex: 0,
+  selectedSavedId: null,
 };
 
-let detectedButtons = [];
-let savedButtons = [];
-let lastPage = null;
+const elements = {
+  scanPageButton: document.getElementById("scanPageButton"),
+  saveAllButton: document.getElementById("saveAllButton"),
+  saveCurrentButton: document.getElementById("saveCurrentButton"),
+  clearLibraryButton: document.getElementById("clearLibraryButton"),
+  capturePrevButton: document.getElementById("capturePrevButton"),
+  captureNextButton: document.getElementById("captureNextButton"),
+  removeSavedButton: document.getElementById("removeSavedButton"),
+  statusMessage: document.getElementById("statusMessage"),
+  scanCountBadge: document.getElementById("scanCountBadge"),
+  pageFacts: document.getElementById("pageFacts"),
+  detectedEmpty: document.getElementById("detectedEmpty"),
+  detectedInspector: document.getElementById("detectedInspector"),
+  inspectorTitle: document.getElementById("inspectorTitle"),
+  inspectorSubtitle: document.getElementById("inspectorSubtitle"),
+  inspectorPreview: document.getElementById("inspectorPreview"),
+  inspectorSize: document.getElementById("inspectorSize"),
+  inspectorFont: document.getElementById("inspectorFont"),
+  inspectorWeight: document.getElementById("inspectorWeight"),
+  inspectorBackground: document.getElementById("inspectorBackground"),
+  inspectorText: document.getElementById("inspectorText"),
+  inspectorBorder: document.getElementById("inspectorBorder"),
+  inspectorRadius: document.getElementById("inspectorRadius"),
+  inspectorShadow: document.getElementById("inspectorShadow"),
+  inspectorPalette: document.getElementById("inspectorPalette"),
+  inspectorSelector: document.getElementById("inspectorSelector"),
+  inspectorMarkup: document.getElementById("inspectorMarkup"),
+  savedEmpty: document.getElementById("savedEmpty"),
+  savedLibrary: document.getElementById("savedLibrary"),
+  savedDetails: document.getElementById("savedDetails"),
+  savedDetailsTitle: document.getElementById("savedDetailsTitle"),
+  savedDetailsFont: document.getElementById("savedDetailsFont"),
+  savedDetailsBackground: document.getElementById("savedDetailsBackground"),
+  savedDetailsBorder: document.getElementById("savedDetailsBorder"),
+  savedDetailsShadow: document.getElementById("savedDetailsShadow"),
+  savedDetailsPalette: document.getElementById("savedDetailsPalette"),
+};
 
-void initializeApp();
+bootstrap().catch((error) => {
+  console.error(error);
+  setStatus(error.message || "Buttonizer could not start.", "Error");
+});
 
-async function initializeApp() {
-  wireEvents();
+async function bootstrap() {
+  bindEvents();
   await loadSavedButtons();
-  renderDetectedButtons();
-  renderSavedButtons();
+  renderAll();
 }
 
-function wireEvents() {
-  refs.scanButton.addEventListener("click", () => {
-    void scanCurrentPage();
-  });
-
-  refs.saveAllButton.addEventListener("click", () => {
-    void saveAllDetectedButtons();
-  });
-
-  refs.clearLibraryButton.addEventListener("click", async () => {
-    savedButtons = [];
-    await chrome.storage.local.set({ [storage_key]: savedButtons });
-    renderSavedButtons();
-    showStatus("Saved library cleared.");
-  });
-}
-
-async function scanCurrentPage() {
-  try {
-    showStatus("");
-    refs.scanButton.disabled = true;
-    refs.scanButton.textContent = "Scanning...";
-
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab?.id) {
-      throw new Error("No active tab found.");
-    }
-
-    const [{ result }] = await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      func: scrapeButtonsFromPage
-    });
-
-    detectedButtons = result?.buttons ?? [];
-    lastPage = result?.page ?? null;
-
-    refs.pageMeta.textContent = lastPage
-      ? `${lastPage.title} · ${lastPage.hostname}`
-      : "No page context available.";
-
-    renderDetectedButtons();
-
-    if (!detectedButtons.length) {
-      showStatus("No visible buttons were detected on this page.", true);
-      return;
-    }
-
-    showStatus(`${detectedButtons.length} button${detectedButtons.length === 1 ? "" : "s"} detected.`);
-  } catch (error) {
-    console.error(error);
-    detectedButtons = [];
-    renderDetectedButtons();
-    refs.pageMeta.textContent = "Scan unavailable for this page.";
-    showStatus(error instanceof Error ? error.message : "Could not scan the current page.", true);
-  } finally {
-    refs.scanButton.disabled = false;
-    refs.scanButton.textContent = "Scan current page";
-  }
+function bindEvents() {
+  elements.scanPageButton.addEventListener("click", handleScanPage);
+  elements.saveAllButton.addEventListener("click", handleSaveAll);
+  elements.saveCurrentButton.addEventListener("click", handleSaveCurrent);
+  elements.clearLibraryButton.addEventListener("click", handleClearLibrary);
+  elements.capturePrevButton.addEventListener("click", () => moveDetected(-1));
+  elements.captureNextButton.addEventListener("click", () => moveDetected(1));
+  elements.removeSavedButton.addEventListener("click", handleRemoveSelectedSaved);
 }
 
 async function loadSavedButtons() {
-  const data = await chrome.storage.local.get(storage_key);
-  savedButtons = Array.isArray(data?.[storage_key]) ? data[storage_key] : [];
+  const result = await chrome.storage.local.get(STORAGE_KEY);
+  state.savedButtons = Array.isArray(result[STORAGE_KEY]) ? result[STORAGE_KEY] : [];
+  state.selectedSavedId = state.savedButtons[0]?.id || null;
 }
 
-async function saveButtonRecord(buttonRecord) {
-  const existingIndex = savedButtons.findIndex((item) => item.id === buttonRecord.id);
-  const enriched = {
-    ...buttonRecord,
-    savedAt: new Date().toISOString()
-  };
+async function persistSavedButtons() {
+  await chrome.storage.local.set({ [STORAGE_KEY]: state.savedButtons });
+}
 
-  if (existingIndex >= 0) {
-    savedButtons[existingIndex] = enriched;
+function setStatus(message, status) {
+  state.status = status;
+  elements.statusMessage.textContent = message;
+  renderPageFacts();
+}
+
+function renderAll() {
+  renderPageFacts();
+  renderCaptureInspector();
+  renderSavedLibrary();
+  elements.saveAllButton.disabled = state.detectedButtons.length === 0;
+  elements.clearLibraryButton.disabled = state.savedButtons.length === 0;
+}
+
+function renderPageFacts() {
+  const facts = [
+    { label: "Title", value: state.pageTitle },
+    { label: "URL", value: state.pageUrl },
+    { label: "Status", value: state.status },
+  ];
+
+  elements.pageFacts.innerHTML = facts
+    .map(
+      (fact) => `
+        <div class="fact-card">
+          <span class="fact-card__label">${escapeHtml(fact.label)}</span>
+          <p class="fact-card__value">${escapeHtml(fact.value)}</p>
+        </div>
+      `
+    )
+    .join("");
+}
+
+function renderCaptureInspector() {
+  const count = state.detectedButtons.length;
+  elements.scanCountBadge.textContent = count === 0 ? "0 found" : `${state.detectedIndex + 1} / ${count}`;
+  elements.capturePrevButton.disabled = count <= 1;
+  elements.captureNextButton.disabled = count <= 1;
+  elements.detectedEmpty.hidden = count > 0;
+  elements.detectedInspector.hidden = count === 0;
+  elements.saveCurrentButton.disabled = count === 0;
+
+  if (count === 0) {
+    return;
+  }
+
+  const item = state.detectedButtons[state.detectedIndex];
+  renderInspector(item);
+}
+
+function renderInspector(item) {
+  elements.inspectorTitle.textContent = item.label || "Unnamed button";
+  elements.inspectorSubtitle.textContent = `${item.pageTitle || "Unknown page"} · ${item.hostname || "Local page"}`;
+  elements.inspectorPreview.textContent = item.label || "Button";
+  applyPreviewStyle(elements.inspectorPreview, item.styles);
+
+  elements.inspectorSize.textContent = `${item.width}px × ${item.height}px`;
+  elements.inspectorFont.textContent = compactFontFamily(item.styles.fontFamily);
+  elements.inspectorWeight.textContent = item.styles.fontWeight || "400";
+  elements.inspectorBackground.textContent = item.styles.backgroundColor || "Transparent";
+  elements.inspectorText.textContent = item.styles.color || "Inherited";
+  elements.inspectorBorder.textContent = formatBorder(item.styles);
+  elements.inspectorRadius.textContent = item.styles.borderRadius || "0px";
+  elements.inspectorShadow.textContent = item.styles.boxShadow || "None";
+  elements.inspectorSelector.textContent = item.selector || "No selector available";
+  elements.inspectorMarkup.textContent = item.outerHtml || "<button></button>";
+
+  renderPalette(elements.inspectorPalette, item.palette || []);
+}
+
+function renderSavedLibrary() {
+  elements.savedLibrary.innerHTML = "";
+  elements.savedEmpty.hidden = state.savedButtons.length > 0;
+  elements.savedLibrary.hidden = state.savedButtons.length === 0;
+  elements.savedDetails.hidden = state.savedButtons.length === 0;
+
+  if (state.savedButtons.length === 0) {
+    state.selectedSavedId = null;
+    return;
+  }
+
+  if (!state.savedButtons.some((item) => item.id === state.selectedSavedId)) {
+    state.selectedSavedId = state.savedButtons[0].id;
+  }
+
+  const fragment = document.createDocumentFragment();
+
+  state.savedButtons.forEach((item) => {
+    const wrapper = document.createElement("div");
+    wrapper.className = "saved-button-wrap";
+
+    const previewButton = document.createElement("button");
+    previewButton.className = "saved-button";
+    if (item.id === state.selectedSavedId) {
+      previewButton.classList.add("is-active");
+    }
+    previewButton.type = "button";
+    previewButton.textContent = item.label || "Button";
+    applyPreviewStyle(previewButton, item.styles);
+    previewButton.addEventListener("click", () => {
+      state.selectedSavedId = item.id;
+      renderSavedLibrary();
+    });
+
+    const removeButton = document.createElement("button");
+    removeButton.className = "saved-button__remove";
+    removeButton.type = "button";
+    removeButton.setAttribute("aria-label", `Remove ${item.label || "button"}`);
+    removeButton.textContent = "×";
+    removeButton.addEventListener("click", async () => {
+      await removeSavedItem(item.id);
+    });
+
+    wrapper.append(previewButton, removeButton);
+    fragment.appendChild(wrapper);
+  });
+
+  elements.savedLibrary.appendChild(fragment);
+
+  const selectedItem = state.savedButtons.find((item) => item.id === state.selectedSavedId) || state.savedButtons[0];
+  renderSavedDetails(selectedItem);
+}
+
+function renderSavedDetails(item) {
+  if (!item) {
+    elements.savedDetails.hidden = true;
+    return;
+  }
+
+  elements.savedDetails.hidden = false;
+  elements.savedDetailsTitle.textContent = item.label || "Unnamed button";
+  elements.savedDetailsFont.textContent = `Font: ${compactFontFamily(item.styles.fontFamily)} · ${item.styles.fontWeight || "400"}`;
+  elements.savedDetailsBackground.textContent = `Background: ${item.styles.backgroundColor || "Transparent"}`;
+  elements.savedDetailsBorder.textContent = `Border: ${formatBorder(item.styles)}`;
+  elements.savedDetailsShadow.textContent = `Shadow: ${item.styles.boxShadow || "None"}`;
+  renderPalette(elements.savedDetailsPalette, item.palette || []);
+}
+
+function moveDetected(direction) {
+  if (state.detectedButtons.length <= 1) {
+    return;
+  }
+
+  const lastIndex = state.detectedButtons.length - 1;
+  if (direction > 0) {
+    state.detectedIndex = state.detectedIndex === lastIndex ? 0 : state.detectedIndex + 1;
   } else {
-    savedButtons.unshift(enriched);
+    state.detectedIndex = state.detectedIndex === 0 ? lastIndex : state.detectedIndex - 1;
   }
 
-  await chrome.storage.local.set({ [storage_key]: savedButtons });
-  renderSavedButtons();
+  renderCaptureInspector();
 }
 
-async function saveAllDetectedButtons() {
-  for (const button of detectedButtons) {
-    await saveButtonRecord(button);
+async function handleScanPage() {
+  try {
+    setStatus("Scanning visible buttons on the current page...", "Scanning");
+    elements.scanPageButton.disabled = true;
+
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab || typeof tab.id !== "number") {
+      throw new Error("No active tab available.");
+    }
+
+    const injection = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: scanCurrentPageButtons,
+    });
+
+    const result = injection[0] && injection[0].result ? injection[0].result : null;
+    if (!result) {
+      throw new Error("No scan result returned.");
+    }
+
+    state.pageTitle = result.pageTitle || "Untitled page";
+    state.pageUrl = result.pageUrl || "Unknown URL";
+    state.detectedButtons = result.buttons.map(normalizeButtonRecord);
+    state.detectedIndex = 0;
+
+    const count = state.detectedButtons.length;
+    setStatus(
+      count === 0
+        ? "Scan complete. No visible button-like components were detected."
+        : `Scan complete. ${count} button reference${count === 1 ? "" : "s"} captured.`,
+      "Ready"
+    );
+
+    renderAll();
+  } catch (error) {
+    console.error(error);
+    setStatus(error.message || "Scan failed.", "Error");
+  } finally {
+    elements.scanPageButton.disabled = false;
   }
-
-  showStatus(`${detectedButtons.length} button${detectedButtons.length === 1 ? "" : "s"} saved to your library.`);
 }
 
-async function removeSavedButton(id) {
-  savedButtons = savedButtons.filter((item) => item.id !== id);
-  await chrome.storage.local.set({ [storage_key]: savedButtons });
-  renderSavedButtons();
-}
-
-function renderDetectedButtons() {
-  refs.detectedCount.textContent = String(detectedButtons.length);
-  refs.saveAllButton.classList.toggle("hidden", detectedButtons.length <= 1);
-
-  if (!detectedButtons.length) {
-    refs.detectedList.className = "card-list empty-state";
-    refs.detectedList.textContent = "Scan a page to inspect its buttons.";
+async function handleSaveCurrent() {
+  const current = state.detectedButtons[state.detectedIndex];
+  if (!current) {
+    setStatus("There is nothing to save yet.", "Error");
     return;
   }
 
-  refs.detectedList.className = "card-list";
-  refs.detectedList.innerHTML = "";
-
-  for (const button of detectedButtons) {
-    const card = buildButtonCard(button, {
-      actionLabel: isAlreadySaved(button.id) ? "Update saved" : "Save to library",
-      onAction: async () => {
-        await saveButtonRecord(button);
-        renderDetectedButtons();
-        showStatus(`Saved \"${button.name}\" to your library.`);
-      }
-    });
-
-    refs.detectedList.append(card);
-  }
+  await saveDetectedItems([current]);
 }
 
-function renderSavedButtons() {
-  refs.clearLibraryButton.classList.toggle("hidden", !savedButtons.length);
-
-  if (!savedButtons.length) {
-    refs.savedList.className = "card-list empty-state";
-    refs.savedList.textContent = "No saved buttons yet.";
+async function handleSaveAll() {
+  if (state.detectedButtons.length === 0) {
+    setStatus("There is nothing to save yet.", "Error");
     return;
   }
 
-  refs.savedList.className = "card-list";
-  refs.savedList.innerHTML = "";
-
-  for (const button of savedButtons) {
-    const card = buildButtonCard(button, {
-      actionLabel: "Remove",
-      onAction: async () => {
-        await removeSavedButton(button.id);
-        showStatus(`Removed \"${button.name}\" from your library.`);
-      },
-      secondaryText: button.savedAt ? `Saved ${formatTimestamp(button.savedAt)}` : "Saved locally"
-    });
-
-    refs.savedList.append(card);
-  }
+  await saveDetectedItems(state.detectedButtons);
 }
 
-function buildButtonCard(button, { actionLabel, onAction, secondaryText = null }) {
-  const card = document.createElement("article");
-  card.className = "button-card";
+async function saveDetectedItems(items) {
+  const existingIds = new Set(state.savedButtons.map((item) => item.id));
+  const freshItems = items.filter((item) => !existingIds.has(item.id));
 
-  const previewButton = document.createElement("button");
-  previewButton.type = "button";
-  previewButton.className = "button-preview";
-  previewButton.textContent = button.previewLabel;
-  previewButton.disabled = true;
-  applyPreviewStyles(previewButton, button.styles);
-
-  const previewWrap = document.createElement("div");
-  previewWrap.className = "preview-wrap";
-  previewWrap.append(previewButton);
-
-  const metaRow = document.createElement("div");
-  metaRow.className = "meta-row";
-  metaRow.innerHTML = `
-    <span class="meta-pill">${escapeHtml(button.tagName)}</span>
-    <span class="meta-pill">${escapeHtml(button.page.hostname)}</span>
-    <span class="meta-pill">${escapeHtml(button.size.width)} x ${escapeHtml(button.size.height)}</span>
-  `;
-
-  const styles = document.createElement("div");
-  styles.className = "style-list";
-  styles.innerHTML = `
-    <span><strong>Font:</strong> ${escapeHtml(button.styles.fontFamily)} · ${escapeHtml(button.styles.fontSize)} / ${escapeHtml(button.styles.fontWeight)}</span>
-    <span><strong>Background:</strong> ${escapeHtml(button.styles.backgroundColor)}</span>
-    <span><strong>Text:</strong> ${escapeHtml(button.styles.color)}</span>
-    <span><strong>Radius:</strong> ${escapeHtml(button.styles.borderRadius)} · <strong>Shadow:</strong> ${escapeHtml(button.styles.boxShadow)}</span>
-  `;
-
-  const palette = document.createElement("div");
-  palette.className = "palette-row";
-  for (const color of button.palette) {
-    const item = document.createElement("span");
-    item.className = "color-chip";
-    item.innerHTML = `<span class="color-swatch" style="color:${escapeHtml(color)}"></span>${escapeHtml(color)}`;
-    palette.append(item);
+  if (freshItems.length === 0) {
+    setStatus("Those buttons are already stored in your archive.", "Error");
+    return;
   }
 
-  const selector = document.createElement("p");
-  selector.className = "selector";
-  selector.innerHTML = `<strong>Selector:</strong> ${escapeHtml(button.selector)}`;
+  state.savedButtons = [...freshItems, ...state.savedButtons];
+  state.selectedSavedId = freshItems[0].id;
+  await persistSavedButtons();
+  renderAll();
+  setStatus(`Saved ${freshItems.length} button reference${freshItems.length === 1 ? "" : "s"}.`, "Ready");
+}
 
-  const code = document.createElement("pre");
-  code.className = "code-snippet";
-  code.textContent = button.htmlSnippet;
-
-  const actions = document.createElement("div");
-  actions.className = "card-actions";
-
-  if (secondaryText) {
-    const meta = document.createElement("span");
-    meta.className = "meta-pill";
-    meta.textContent = secondaryText;
-    actions.append(meta);
+async function handleRemoveSelectedSaved() {
+  if (!state.selectedSavedId) {
+    return;
   }
 
-  const actionButton = document.createElement("button");
-  actionButton.type = "button";
-  actionButton.className = "card-btn";
-  actionButton.textContent = actionLabel;
-  actionButton.addEventListener("click", () => {
-    void onAction();
+  await removeSavedItem(state.selectedSavedId);
+}
+
+async function removeSavedItem(id) {
+  const target = state.savedButtons.find((item) => item.id === id);
+  state.savedButtons = state.savedButtons.filter((item) => item.id !== id);
+  state.selectedSavedId = state.savedButtons[0]?.id || null;
+  await persistSavedButtons();
+  renderAll();
+  setStatus(`Removed "${target?.label || "button"}" from your archive.`, "Ready");
+}
+
+async function handleClearLibrary() {
+  if (state.savedButtons.length === 0) {
+    setStatus("The archive is already empty.", "Error");
+    return;
+  }
+
+  state.savedButtons = [];
+  state.selectedSavedId = null;
+  await persistSavedButtons();
+  renderAll();
+  setStatus("Archive cleared.", "Ready");
+}
+
+function applyPreviewStyle(node, styles) {
+  node.style.fontFamily = styles.fontFamily || "Arial, sans-serif";
+  node.style.fontSize = styles.fontSize || "14px";
+  node.style.fontWeight = styles.fontWeight || "400";
+  node.style.color = styles.color || "inherit";
+  node.style.background = styles.backgroundColor || "transparent";
+  node.style.borderColor = styles.borderColor || "transparent";
+  node.style.borderStyle = styles.borderStyle || "solid";
+  node.style.borderWidth = styles.borderWidth || "1px";
+  node.style.borderRadius = styles.borderRadius || "0px";
+  node.style.boxShadow = styles.boxShadow || "none";
+  node.style.padding = styles.padding || "10px 16px";
+  node.style.letterSpacing = "normal";
+  node.style.textTransform = "none";
+}
+
+function renderPalette(container, palette) {
+  container.innerHTML = "";
+  const uniqueColors = [...new Set(palette.filter(isVisibleColor))].slice(0, 6);
+
+  if (uniqueColors.length === 0) {
+    const chip = document.createElement("span");
+    chip.className = "meta-chip";
+    chip.textContent = "No palette";
+    container.appendChild(chip);
+    return;
+  }
+
+  uniqueColors.forEach((colorValue) => {
+    const swatch = document.createElement("span");
+    swatch.className = "palette-swatch";
+    swatch.style.background = colorValue;
+    swatch.title = colorValue;
+    container.appendChild(swatch);
   });
-  actions.append(actionButton);
-
-  card.append(previewWrap, metaRow, styles, palette, selector, code, actions);
-  return card;
 }
 
-function applyPreviewStyles(element, styles) {
-  element.style.background = styles.backgroundColor;
-  element.style.color = styles.color;
-  element.style.borderColor = styles.borderColor;
-  element.style.borderStyle = styles.borderStyle;
-  element.style.borderWidth = styles.borderWidth;
-  element.style.borderRadius = styles.borderRadius;
-  element.style.boxShadow = styles.boxShadow;
-  element.style.fontFamily = styles.fontFamily;
-  element.style.fontSize = styles.fontSize;
-  element.style.fontWeight = styles.fontWeight;
-  element.style.padding = styles.padding;
-  element.style.letterSpacing = styles.letterSpacing;
-  element.style.textTransform = styles.textTransform;
-  element.style.minWidth = "fit-content";
-  element.style.opacity = "1";
-  element.style.cursor = "default";
+function normalizeButtonRecord(item) {
+  return {
+    id: buildStableId(item),
+    label: item.label || "Unnamed button",
+    pageTitle: item.pageTitle || "Unknown page",
+    pageUrl: item.pageUrl || "",
+    hostname: item.hostname || "",
+    selector: item.selector || "",
+    outerHtml: item.outerHtml || "",
+    width: Math.round(item.width || 0),
+    height: Math.round(item.height || 0),
+    palette: Array.isArray(item.palette) ? item.palette : [],
+    styles: {
+      fontFamily: item.styles?.fontFamily || "Arial, sans-serif",
+      fontSize: item.styles?.fontSize || "14px",
+      fontWeight: item.styles?.fontWeight || "400",
+      color: item.styles?.color || "",
+      backgroundColor: item.styles?.backgroundColor || "",
+      borderColor: item.styles?.borderColor || "",
+      borderWidth: item.styles?.borderWidth || "0px",
+      borderStyle: item.styles?.borderStyle || "solid",
+      borderRadius: item.styles?.borderRadius || "0px",
+      boxShadow: item.styles?.boxShadow || "none",
+      padding: item.styles?.padding || "10px 16px",
+      letterSpacing: item.styles?.letterSpacing || "normal",
+      textTransform: item.styles?.textTransform || "none",
+    },
+  };
 }
 
-function isAlreadySaved(id) {
-  return savedButtons.some((item) => item.id === id);
+function buildStableId(item) {
+  return [
+    item.pageUrl || "",
+    item.selector || "",
+    item.label || "",
+    Math.round(item.width || 0),
+    Math.round(item.height || 0),
+  ].join("|");
 }
 
-function showStatus(message, isError = false) {
-  refs.statusMessage.textContent = message;
-  refs.statusMessage.classList.toggle("visible", Boolean(message));
-  refs.statusMessage.classList.toggle("error", isError);
+function compactFontFamily(fontFamily) {
+  return String(fontFamily || "Unknown font").split(",")[0].replace(/["']/g, "").trim();
 }
 
-function formatTimestamp(value) {
-  return new Date(value).toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit"
-  });
+function formatBorder(styles) {
+  return `${styles.borderWidth || "0px"} ${styles.borderStyle || "solid"} ${styles.borderColor || "transparent"}`;
+}
+
+function isVisibleColor(value) {
+  return typeof value === "string" && value.trim() !== "" && value !== "rgba(0, 0, 0, 0)" && value !== "transparent";
 }
 
 function escapeHtml(value) {
   return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
-function scrapeButtonsFromPage() {
-  const candidates = Array.from(document.querySelectorAll("button, input[type='button'], input[type='submit'], [role='button']"));
-
-  const buttons = candidates
-    .map((element, index) => serializeButton(element, index))
-    .filter(Boolean)
-    .slice(0, 75);
-
-  return {
-    page: {
-      title: document.title || location.hostname,
-      url: location.href,
-      hostname: location.hostname
-    },
-    buttons
-  };
-
-  function serializeButton(element, index) {
-    const computed = getComputedStyle(element);
-    const rect = element.getBoundingClientRect();
-
-    if (computed.display === "none" || computed.visibility === "hidden" || rect.width < 1 || rect.height < 1) {
-      return null;
+function scanCurrentPageButtons() {
+  function extractShadowColor(boxShadow) {
+    if (!boxShadow || boxShadow === "none") {
+      return "";
     }
 
-    const previewLabel = (
-      element.innerText ||
-      element.getAttribute("aria-label") ||
-      element.getAttribute("title") ||
-      element.value ||
-      element.textContent ||
-      "Button"
-    ).replace(/\s+/g, " ").trim().slice(0, 80) || "Button";
-
-    const selector = buildSelector(element);
-    const palette = uniqueColors([
-      computed.backgroundColor,
-      computed.color,
-      computed.borderColor,
-      ...extractShadowColors(computed.boxShadow)
-    ]);
-
-    return {
-      id: `${location.href}::${selector}::${index}`,
-      name: previewLabel,
-      previewLabel,
-      tagName: element.tagName.toLowerCase(),
-      selector,
-      htmlSnippet: element.outerHTML.slice(0, 600),
-      page: {
-        title: document.title || location.hostname,
-        url: location.href,
-        hostname: location.hostname
-      },
-      size: {
-        width: Math.round(rect.width),
-        height: Math.round(rect.height)
-      },
-      styles: {
-        fontFamily: computed.fontFamily,
-        fontSize: computed.fontSize,
-        fontWeight: computed.fontWeight,
-        color: computed.color,
-        backgroundColor: computed.backgroundColor,
-        borderColor: computed.borderColor,
-        borderWidth: computed.borderWidth,
-        borderStyle: computed.borderStyle,
-        borderRadius: computed.borderRadius,
-        boxShadow: computed.boxShadow,
-        padding: `${computed.paddingTop} ${computed.paddingRight} ${computed.paddingBottom} ${computed.paddingLeft}`,
-        letterSpacing: computed.letterSpacing,
-        textTransform: computed.textTransform
-      },
-      palette
-    };
+    const match = boxShadow.match(/(rgba?\([^)]+\)|#[0-9a-fA-F]{3,8})/);
+    return match ? match[0] : "";
   }
 
-  function buildSelector(element) {
-    if (element.id) {
-      return `#${element.id}`;
+  function buildSelector(node) {
+    if (node.id) {
+      return `#${node.id}`;
     }
 
     const parts = [];
-    let current = element;
+    let current = node;
 
     while (current && current.nodeType === Node.ELEMENT_NODE && parts.length < 4) {
-      let part = current.tagName.toLowerCase();
-      if (current.classList.length) {
-        part += `.${Array.from(current.classList).slice(0, 2).join(".")}`;
+      let selector = current.nodeName.toLowerCase();
+
+      if (current.classList && current.classList.length > 0) {
+        selector += `.${Array.from(current.classList).slice(0, 2).join(".")}`;
+        parts.unshift(selector);
+        break;
       }
-      const siblings = current.parentElement ? Array.from(current.parentElement.children).filter((child) => child.tagName === current.tagName) : [];
-      if (siblings.length > 1) {
-        part += `:nth-of-type(${siblings.indexOf(current) + 1})`;
+
+      const parent = current.parentElement;
+      if (parent) {
+        const siblings = Array.from(parent.children).filter((child) => child.nodeName === current.nodeName);
+        if (siblings.length > 1) {
+          selector += `:nth-of-type(${siblings.indexOf(current) + 1})`;
+        }
       }
-      parts.unshift(part);
+
+      parts.unshift(selector);
       current = current.parentElement;
     }
 
     return parts.join(" > ");
   }
 
-  function uniqueColors(values) {
-    return [...new Set(values.filter((value) => isUsefulColor(value)))].slice(0, 5);
+  function getButtonLabel(node, index) {
+    const rawLabel =
+      node.innerText ||
+      node.value ||
+      node.getAttribute("aria-label") ||
+      node.getAttribute("title") ||
+      `Button ${index + 1}`;
+
+    return rawLabel.replace(/\s+/g, " ").trim() || `Button ${index + 1}`;
   }
 
-  function isUsefulColor(value) {
-    return Boolean(value) && value !== "rgba(0, 0, 0, 0)" && value !== "transparent";
-  }
+  const candidates = Array.from(
+    document.querySelectorAll("button, input[type='button'], input[type='submit'], [role='button']")
+  );
 
-  function extractShadowColors(boxShadow) {
-    if (!boxShadow || boxShadow === "none") return [];
-    return boxShadow.match(/rgba?\([^\)]+\)/g) || [];
-  }
+  const buttons = candidates
+    .filter((node) => {
+      const rect = node.getBoundingClientRect();
+      const computedStyle = window.getComputedStyle(node);
+      return (
+        rect.width > 0 &&
+        rect.height > 0 &&
+        computedStyle.visibility !== "hidden" &&
+        computedStyle.display !== "none" &&
+        computedStyle.opacity !== "0"
+      );
+    })
+    .slice(0, 80)
+    .map((node, index) => {
+      const rect = node.getBoundingClientRect();
+      const computedStyle = window.getComputedStyle(node);
+      const backgroundColor = computedStyle.backgroundColor;
+      const textColor = computedStyle.color;
+      const borderColor = computedStyle.borderColor;
+      const shadowColor = extractShadowColor(computedStyle.boxShadow);
+
+      return {
+        label: getButtonLabel(node, index),
+        pageTitle: document.title || "Untitled page",
+        pageUrl: window.location.href,
+        hostname: window.location.hostname,
+        selector: buildSelector(node),
+        outerHtml: node.outerHTML.slice(0, 600),
+        width: rect.width,
+        height: rect.height,
+        palette: [backgroundColor, textColor, borderColor, shadowColor],
+        styles: {
+          fontFamily: computedStyle.fontFamily,
+          fontSize: computedStyle.fontSize,
+          fontWeight: computedStyle.fontWeight,
+          color: textColor,
+          backgroundColor,
+          borderColor,
+          borderWidth: computedStyle.borderWidth,
+          borderStyle: computedStyle.borderStyle,
+          borderRadius: computedStyle.borderRadius,
+          boxShadow: computedStyle.boxShadow,
+          padding: computedStyle.padding,
+          letterSpacing: computedStyle.letterSpacing,
+          textTransform: computedStyle.textTransform,
+        },
+      };
+    });
+
+  return {
+    pageTitle: document.title || "Untitled page",
+    pageUrl: window.location.href,
+    buttons,
+  };
 }

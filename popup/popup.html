@@ -1,59 +1,156 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Buttonizer</title>
+    <link rel="stylesheet" href="./popup.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="workspace-panel">
+        <header class="workspace-panel__hero">
+          <div class="workspace-panel__copy">
+            <p class="eyebrow">Buttonizer</p>
+            <h1>Capture and keep useful buttons</h1>
+            <p class="hero-copy">
+              Scan the current page, isolate the button components you like, and keep them in your own private archive with their visual details.
+            </p>
+          </div>
+          <div class="workspace-panel__actions">
+            <button id="scanPageButton" class="ui-button ui-button--primary" type="button">Scan page</button>
+            <button id="saveAllButton" class="ui-button ui-button--secondary" type="button" disabled>Save all</button>
+          </div>
+        </header>
 
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Buttonizer</title>
-  <link rel="stylesheet" href="./popup.css">
-</head>
+        <p id="statusMessage" class="status-banner" role="status">Ready to inspect the active tab.</p>
 
-<body>
-  <main class="app">
-    <section class="hero panel">
-      <div>
-        <p class="eyebrow">PRIVATE BUTTON LIBRARY</p>
-        <h1>Buttonizer</h1>
-        <p class="hero-copy">Capture buttons from the current page, inspect their styling, and keep a local swipe file you can revisit anytime.</p>
-      </div>
-      <div class="hero-actions">
-        <button id="scanButton" class="primary-btn" type="button">Scan current page</button>
-        <button id="saveAllButton" class="secondary-btn hidden" type="button">Save all found</button>
-      </div>
-      <p id="statusMessage" class="status-message hidden" aria-live="polite"></p>
-    </section>
-
-    <section class="panel compact-panel">
-      <div class="panel-heading compact-heading">
-        <p class="panel-title">Current page</p>
-        <p id="pageMeta" class="panel-copy">No scan yet.</p>
-      </div>
-    </section>
-
-    <section class="panel detected-panel">
-      <div class="section-head">
-        <div class="panel-heading compact-heading">
-          <p class="panel-title">Detected buttons</p>
-          <p class="panel-copy">Visible buttons found in the active tab.</p>
+        <div id="pageFacts" class="facts-grid">
+          <div class="fact-card">
+            <span class="fact-card__label">Title</span>
+            <p class="fact-card__value">No page scanned yet</p>
+          </div>
+          <div class="fact-card">
+            <span class="fact-card__label">URL</span>
+            <p class="fact-card__value">Run a scan to inspect visible buttons</p>
+          </div>
+          <div class="fact-card">
+            <span class="fact-card__label">Status</span>
+            <p class="fact-card__value">Idle</p>
+          </div>
         </div>
-        <span id="detectedCount" class="count-badge">0</span>
-      </div>
-      <div id="detectedList" class="card-list empty-state">Scan a page to inspect its buttons.</div>
-    </section>
 
-    <section class="panel library-panel">
-      <div class="section-head">
-        <div class="panel-heading compact-heading">
-          <p class="panel-title">Saved library</p>
-          <p class="panel-copy">Your private local collection of captured button styles.</p>
+        <section class="capture-panel">
+          <div class="capture-panel__header">
+            <div>
+              <p class="section-label">Live capture</p>
+              <h2>Current button</h2>
+            </div>
+            <div class="capture-nav">
+              <button id="capturePrevButton" class="nav-button" type="button" aria-label="Previous button">&#8249;</button>
+              <span id="scanCountBadge" class="counter-pill">0 found</span>
+              <button id="captureNextButton" class="nav-button" type="button" aria-label="Next button">&#8250;</button>
+            </div>
+          </div>
+
+          <div id="detectedEmpty" class="empty-state">
+            <p>Scan a page to start browsing its visible buttons one by one.</p>
+          </div>
+
+          <article id="detectedInspector" class="inspector-card" hidden>
+            <div class="inspector-card__header">
+              <div class="inspector-card__title-wrap">
+                <h3 id="inspectorTitle"></h3>
+                <p id="inspectorSubtitle" class="inspector-card__subtitle"></p>
+              </div>
+              <button id="saveCurrentButton" class="ui-button ui-button--mini ui-button--secondary" type="button">Save</button>
+            </div>
+
+            <div class="preview-stage">
+              <button id="inspectorPreview" class="preview-stage__button" type="button"></button>
+            </div>
+
+            <div class="meta-row">
+              <span id="inspectorSize" class="meta-chip"></span>
+              <span id="inspectorFont" class="meta-chip"></span>
+              <span id="inspectorWeight" class="meta-chip"></span>
+            </div>
+
+            <div class="details-grid">
+              <div class="detail-item">
+                <span class="detail-item__label">Background</span>
+                <p id="inspectorBackground" class="detail-item__value"></p>
+              </div>
+              <div class="detail-item">
+                <span class="detail-item__label">Text</span>
+                <p id="inspectorText" class="detail-item__value"></p>
+              </div>
+              <div class="detail-item">
+                <span class="detail-item__label">Border</span>
+                <p id="inspectorBorder" class="detail-item__value"></p>
+              </div>
+              <div class="detail-item">
+                <span class="detail-item__label">Radius</span>
+                <p id="inspectorRadius" class="detail-item__value"></p>
+              </div>
+              <div class="detail-item detail-item--full">
+                <span class="detail-item__label">Shadow</span>
+                <p id="inspectorShadow" class="detail-item__value"></p>
+              </div>
+            </div>
+
+            <div>
+              <p class="section-label">Palette</p>
+              <div id="inspectorPalette" class="palette-row" aria-label="Extracted palette"></div>
+            </div>
+
+            <div class="snippet-block">
+              <p class="section-label">Selector</p>
+              <p id="inspectorSelector" class="snippet-block__value snippet-block__value--selector"></p>
+            </div>
+
+            <div class="snippet-block">
+              <p class="section-label">Markup</p>
+              <pre id="inspectorMarkup" class="snippet-block__value snippet-block__value--code"></pre>
+            </div>
+          </article>
+        </section>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <p class="section-label">Saved</p>
+            <h2>Archive</h2>
+          </div>
+          <button id="clearLibraryButton" class="ui-button ui-button--ghost" type="button">Clear library</button>
         </div>
-        <button id="clearLibraryButton" class="ghost-btn hidden" type="button">Clear library</button>
-      </div>
-      <div id="savedList" class="card-list empty-state">No saved buttons yet.</div>
-    </section>
-  </main>
 
-  <script src="./popup.js"></script>
-</body>
+        <div id="savedEmpty" class="empty-state">
+          <p>Your saved buttons stay here between sessions.</p>
+        </div>
 
+        <div id="savedLibrary" class="saved-library" hidden></div>
+
+        <div id="savedDetails" class="saved-details" hidden>
+          <div class="saved-details__header">
+            <div>
+              <p class="section-label">Saved details</p>
+              <h3 id="savedDetailsTitle"></h3>
+            </div>
+            <button id="removeSavedButton" class="ui-button ui-button--mini ui-button--secondary" type="button">Remove</button>
+          </div>
+          <div class="saved-details__meta">
+            <p id="savedDetailsFont"></p>
+            <p id="savedDetailsBackground"></p>
+            <p id="savedDetailsBorder"></p>
+            <p id="savedDetailsShadow"></p>
+          </div>
+          <div id="savedDetailsPalette" class="palette-row" aria-label="Saved palette"></div>
+        </div>
+      </section>
+    </main>
+
+    <script src="./popup.js" type="module"></script>
+  </body>
 </html>

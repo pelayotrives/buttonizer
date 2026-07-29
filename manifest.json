@@ -2,9 +2,10 @@
   "manifest_version": 3,
   "name": "Buttonizer",
   "version": "0.0.1",
-  "description": "Capture buttons from any page, inspect their visual styles, and save them to a private local library.",
+  "description": "Scan the current page for buttons, inspect their visual styles, and save them to a private local library.",
   "action": {
-    "default_popup": "popup/popup.html"
+    "default_popup": "popup/popup.html",
+    "default_title": "Buttonizer"
   },
   "permissions": [
     "activeTab",
