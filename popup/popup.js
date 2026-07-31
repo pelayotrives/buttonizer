@@ -163,7 +163,7 @@ function renderInspector(item) {
   elements.inspectorTitle.textContent = item.label || "Unnamed button";
   elements.inspectorSubtitle.textContent = `${item.pageTitle || "Unknown page"} · ${item.hostname || "Local page"}`;
   elements.inspectorPreview.textContent = item.label || "Button";
-  applyPreviewStyle(elements.inspectorPreview, item.styles);
+  applyPreviewStyle(elements.inspectorPreview, item.styles, item.width, item.height);
 
   elements.inspectorSize.textContent = `${item.width}px × ${item.height}px`;
   elements.inspectorFont.textContent = compactFontFamily(item.styles.fontFamily);
@@ -208,7 +208,7 @@ function renderSavedLibrary() {
     }
     previewButton.type = "button";
     previewButton.textContent = item.label || "Button";
-    applyPreviewStyle(previewButton, item.styles);
+    applyPreviewStyle(previewButton, item.styles, item.width, item.height);
     previewButton.addEventListener("click", () => {
       state.selectedSavedId = item.id;
       renderSavedLibrary();
@@ -394,20 +394,34 @@ async function handleCopyMarkup() {
   await copyText(value, "Markup copied.");
 }
 
-function applyPreviewStyle(node, styles) {
+function applyPreviewStyle(node, styles, width = 0, height = 0) {
   node.style.fontFamily = styles.fontFamily || "Arial, sans-serif";
   node.style.fontSize = styles.fontSize || "14px";
   node.style.fontWeight = styles.fontWeight || "400";
+  node.style.lineHeight = styles.lineHeight || "normal";
   node.style.color = styles.color || "inherit";
-  node.style.background = styles.backgroundColor || "transparent";
-  node.style.borderColor = styles.borderColor || "transparent";
-  node.style.borderStyle = styles.borderStyle || "solid";
-  node.style.borderWidth = styles.borderWidth || "1px";
+  node.style.background = styles.background || styles.backgroundColor || "transparent";
+  node.style.backgroundImage = styles.backgroundImage || "none";
+  node.style.backgroundPosition = styles.backgroundPosition || "0% 0%";
+  node.style.backgroundSize = styles.backgroundSize || "auto";
+  node.style.backgroundRepeat = styles.backgroundRepeat || "repeat";
+  node.style.border = styles.border || `${styles.borderWidth || "0px"} ${styles.borderStyle || "solid"} ${styles.borderColor || "transparent"}`;
   node.style.borderRadius = styles.borderRadius || "0px";
   node.style.boxShadow = styles.boxShadow || "none";
+  node.style.outline = styles.outline || "none";
+  node.style.outlineOffset = styles.outlineOffset || "0px";
   node.style.padding = styles.padding || "10px 16px";
-  node.style.letterSpacing = "normal";
-  node.style.textTransform = "none";
+  node.style.display = styles.display || "inline-flex";
+  node.style.alignItems = styles.alignItems || "center";
+  node.style.justifyContent = styles.justifyContent || "center";
+  node.style.gap = styles.gap || "0px";
+  node.style.textAlign = styles.textAlign || "center";
+  node.style.minWidth = styles.minWidth || (width ? `${Math.round(width)}px` : "auto");
+  node.style.minHeight = styles.minHeight || (height ? `${Math.round(height)}px` : "auto");
+  node.style.width = styles.width && styles.width !== "auto" ? styles.width : "auto";
+  node.style.height = styles.height && styles.height !== "auto" ? styles.height : "auto";
+  node.style.letterSpacing = styles.letterSpacing || "normal";
+  node.style.textTransform = styles.textTransform || "none";
 }
 
 function renderPalette(container, palette) {
@@ -492,13 +506,31 @@ function normalizeButtonRecord(item) {
       fontSize: item.styles?.fontSize || "14px",
       fontWeight: item.styles?.fontWeight || "400",
       color: item.styles?.color || "",
+      background: item.styles?.background || "",
       backgroundColor: item.styles?.backgroundColor || "",
+      backgroundImage: item.styles?.backgroundImage || "",
+      backgroundPosition: item.styles?.backgroundPosition || "",
+      backgroundSize: item.styles?.backgroundSize || "",
+      backgroundRepeat: item.styles?.backgroundRepeat || "",
+      border: item.styles?.border || "",
       borderColor: item.styles?.borderColor || "",
       borderWidth: item.styles?.borderWidth || "0px",
       borderStyle: item.styles?.borderStyle || "solid",
       borderRadius: item.styles?.borderRadius || "0px",
       boxShadow: item.styles?.boxShadow || "none",
+      outline: item.styles?.outline || "none",
+      outlineOffset: item.styles?.outlineOffset || "0px",
       padding: item.styles?.padding || "10px 16px",
+      display: item.styles?.display || "inline-flex",
+      alignItems: item.styles?.alignItems || "center",
+      justifyContent: item.styles?.justifyContent || "center",
+      gap: item.styles?.gap || "0px",
+      lineHeight: item.styles?.lineHeight || "normal",
+      textAlign: item.styles?.textAlign || "center",
+      minWidth: item.styles?.minWidth || "",
+      minHeight: item.styles?.minHeight || "",
+      width: item.styles?.width || "auto",
+      height: item.styles?.height || "auto",
       letterSpacing: item.styles?.letterSpacing || "normal",
       textTransform: item.styles?.textTransform || "none",
     },
@@ -753,6 +785,8 @@ function scanCurrentPageButtons() {
       const textColor = computedStyle.color;
       const borderColor = computedStyle.borderColor;
       const shadowColor = extractShadowColor(computedStyle.boxShadow);
+      const measuredWidth = Math.round(rect.width);
+      const measuredHeight = Math.round(rect.height);
 
       return {
         label: getButtonLabel(node, index),
@@ -768,14 +802,32 @@ function scanCurrentPageButtons() {
           fontFamily: computedStyle.fontFamily,
           fontSize: computedStyle.fontSize,
           fontWeight: computedStyle.fontWeight,
+          lineHeight: computedStyle.lineHeight,
           color: textColor,
+          background: computedStyle.background,
           backgroundColor,
+          backgroundImage: computedStyle.backgroundImage,
+          backgroundPosition: computedStyle.backgroundPosition,
+          backgroundSize: computedStyle.backgroundSize,
+          backgroundRepeat: computedStyle.backgroundRepeat,
+          border: computedStyle.border,
           borderColor,
           borderWidth: computedStyle.borderWidth,
           borderStyle: computedStyle.borderStyle,
           borderRadius: computedStyle.borderRadius,
           boxShadow: computedStyle.boxShadow,
+          outline: computedStyle.outline,
+          outlineOffset: computedStyle.outlineOffset,
           padding: computedStyle.padding,
+          display: computedStyle.display,
+          alignItems: computedStyle.alignItems,
+          justifyContent: computedStyle.justifyContent,
+          gap: computedStyle.gap,
+          textAlign: computedStyle.textAlign,
+          minWidth: computedStyle.minWidth !== '0px' ? computedStyle.minWidth : `${measuredWidth}px`,
+          minHeight: computedStyle.minHeight !== '0px' ? computedStyle.minHeight : `${measuredHeight}px`,
+          width: computedStyle.width,
+          height: computedStyle.height,
           letterSpacing: computedStyle.letterSpacing,
           textTransform: computedStyle.textTransform,
         },
