@@ -547,8 +547,12 @@ function buildCssSnippet(item) {
 }
 
 function normalizeFontFamily(fontFamily) {
-  const value = String(fontFamily || "Arial, sans-serif").trim();
-  return /["']/.test(value) ? value : value.replace(/([^,]+)/g, '"$1"').replace(/"\s+/g, '"').replace(/\s+"/g, '"');
+  return String(fontFamily || "Arial, sans-serif")
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => (/^[a-z-]+$/i.test(part) ? part : `"${part.replace(/["']/g, "")}"`))
+    .join(", ");
 }
 
 function toKebabCase(value) {
