@@ -97,8 +97,17 @@ function showToast(message) {
 
   elements.toastMessage.textContent = message;
   elements.toastMessage.hidden = false;
+  window.requestAnimationFrame(() => {
+    elements.toastMessage.classList.add("is-visible");
+  });
+
   state.toastTimer = window.setTimeout(() => {
-    elements.toastMessage.hidden = true;
+    elements.toastMessage.classList.remove("is-visible");
+    window.setTimeout(() => {
+      if (!elements.toastMessage.classList.contains("is-visible")) {
+        elements.toastMessage.hidden = true;
+      }
+    }, 180);
     state.toastTimer = null;
   }, 1800);
 }
