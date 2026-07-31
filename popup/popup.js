@@ -4,7 +4,7 @@ const state = {
   detectedButtons: [],
   savedButtons: [],
   pageTitle: "No page scanned yet",
-  pageUrl: "Run a scan to inspect visible buttons",
+  pageUrl: "Scan a page to inspect visible buttons",
   status: "Idle",
   detectedIndex: 0,
   selectedSavedId: null,
@@ -114,8 +114,7 @@ function renderAll() {
 function renderPageFacts() {
   const facts = [
     { label: "Title", value: state.pageTitle },
-    { label: "URL", value: state.pageUrl },
-    { label: "Status", value: state.status },
+    { label: "Domain", value: state.pageUrl },
   ];
 
   elements.pageFacts.innerHTML = facts
@@ -272,7 +271,7 @@ async function handleScanPage() {
     }
 
     state.pageTitle = result.pageTitle || "Untitled page";
-    state.pageUrl = result.pageUrl || "Unknown URL";
+    state.pageUrl = formatDomainLabel(result.pageUrl);
     state.detectedButtons = result.buttons.map(normalizeButtonRecord);
     state.detectedIndex = 0;
 
@@ -491,6 +490,19 @@ function buildStableId(item) {
     Math.round(item.width || 0),
     Math.round(item.height || 0),
   ].join("|");
+}
+
+function formatDomainLabel(pageUrl) {
+  if (!pageUrl) {
+    return "Unknown domain";
+  }
+
+  try {
+    const url = new URL(pageUrl);
+    return `${url.origin}/*`;
+  } catch (error) {
+    return pageUrl;
+  }
 }
 
 function compactFontFamily(fontFamily) {
