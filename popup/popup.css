@@ -649,7 +649,6 @@ h3 {
 .saved-button-wrap {
   display: flex;
   align-items: center;
-  gap: var(--space-1);
   width: 100%;
   min-width: 0;
 }
@@ -657,17 +656,19 @@ h3 {
 .saved-button {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   flex: 1 1 auto;
   min-width: 0;
+  width: 100%;
   min-height: 30px;
-  max-width: calc(100% - 28px);
   padding: 0;
-  border: 1px solid var(--color-border-strong);
-  border-radius: 9999px;
+  border: 0;
+  border-radius: 0;
   font-size: var(--text-sm);
   font-weight: 700;
   overflow: hidden;
-  background: #ffffff;
+  background: transparent;
+  box-shadow: none;
 }
 
 .saved-button > * {
@@ -675,7 +676,43 @@ h3 {
 }
 
 .saved-button.is-active {
-  background: var(--color-soft);
+  outline: 2px solid rgba(21, 97, 109, 0.18);
+  outline-offset: 4px;
+}
+
+.context-menu {
+  position: fixed;
+  z-index: 1200;
+  min-width: 120px;
+  padding: 6px;
+  border: 1px solid rgba(0, 21, 36, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 12px 24px rgba(0, 21, 36, 0.14);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.context-menu__item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-ink);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.context-menu__item:hover,
+.context-menu__item:focus-visible {
+  background: rgba(21, 97, 109, 0.1);
+  outline: none;
 }
 
 .saved-details {
