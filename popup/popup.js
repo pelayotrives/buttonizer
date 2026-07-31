@@ -9,6 +9,7 @@ const state = {
   detectedIndex: 0,
   selectedSavedId: null,
   toastTimer: null,
+  contextMenuId: null,
 };
 
 const elements = {
@@ -16,6 +17,8 @@ const elements = {
   saveAllButton: document.getElementById("saveAllButton"),
   saveCurrentButton: document.getElementById("saveCurrentButton"),
   clearLibraryButton: document.getElementById("clearLibraryButton"),
+  savedContextMenu: document.getElementById("savedContextMenu"),
+  savedContextDeleteButton: document.getElementById("savedContextDeleteButton"),
   capturePrevButton: document.getElementById("capturePrevButton"),
   captureNextButton: document.getElementById("captureNextButton"),
   removeSavedButton: document.getElementById("removeSavedButton"),
@@ -75,6 +78,10 @@ function bindEvents() {
   elements.removeSavedButton.addEventListener("click", handleRemoveSelectedSaved);
   elements.copySavedCssButton.addEventListener("click", handleCopySavedCss);
   elements.copyMarkupButton.addEventListener("click", handleCopyMarkup);
+  elements.savedContextDeleteButton.addEventListener("click", handleContextDelete);
+  document.addEventListener("click", handleGlobalPointerDown);
+  document.addEventListener("contextmenu", handleGlobalContextMenu);
+  document.addEventListener("keydown", handleGlobalKeyDown);
 }
 
 async function loadSavedButtons() {
@@ -183,6 +190,9 @@ function renderSavedLibrary() {
   elements.savedEmpty.hidden = state.savedButtons.length > 0;
   elements.savedLibrary.hidden = state.savedButtons.length === 0;
   elements.savedDetails.hidden = state.savedButtons.length === 0;
+  if (state.savedButtons.length === 0) {
+    hideSavedContextMenu();
+  }
   elements.copySavedCssButton.disabled = state.savedButtons.length === 0;
 
   if (state.savedButtons.length === 0) {
@@ -207,29 +217,29 @@ function renderSavedLibrary() {
     }
     previewButton.setAttribute("role", "button");
     previewButton.tabIndex = 0;
+    previewButton.dataset.savedId = item.id;
     renderSavedButtonSurface(previewButton, item);
     previewButton.addEventListener("click", () => {
+      hideSavedContextMenu();
       state.selectedSavedId = item.id;
       renderSavedLibrary();
     });
     previewButton.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
+        hideSavedContextMenu();
         state.selectedSavedId = item.id;
         renderSavedLibrary();
       }
     });
-
-    const removeButton = document.createElement("button");
-    removeButton.className = "saved-button__remove";
-    removeButton.type = "button";
-    removeButton.setAttribute("aria-label", `Remove ${item.label || "button"}`);
-    removeButton.textContent = "×";
-    removeButton.addEventListener("click", async () => {
-      await removeSavedItem(item.id);
+    previewButton.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      state.selectedSavedId = item.id;
+      renderSavedLibrary();
+      showSavedContextMenu(event.clientX, event.clientY, item.id);
     });
 
-    wrapper.append(previewButton, removeButton);
+    wrapper.append(previewButton);
     fragment.appendChild(wrapper);
   });
 
@@ -246,6 +256,7 @@ function renderSavedDetails(item) {
   }
 
   elements.savedDetails.hidden = false;
+  elements.savedContextDeleteButton.disabled = false;
   elements.savedDetailsTitle.textContent = item.label || "Unnamed button";
   elements.savedDetailsFont.textContent = `Font: ${compactFontFamily(item.styles.fontFamily)} · ${item.styles.fontWeight || "400"}`;
   elements.savedDetailsBackground.textContent = `Background: ${item.styles.backgroundColor || "Transparent"}`;
@@ -276,6 +287,8 @@ function renderSavedButtonSurface(container, item) {
       root.style.maxWidth = "100%";
       root.style.minWidth = "0";
       root.style.boxSizing = "border-box";
+      root.style.margin = "0";
+      root.style.flexShrink = "1";
       if (item.width > 260) {
         root.style.width = "100%";
       }
@@ -289,6 +302,7 @@ function renderSavedButtonSurface(container, item) {
   applyPreviewStyle(fallback, item.styles, item.width, item.height);
   fallback.style.maxWidth = "100%";
   fallback.style.minWidth = "0";
+  fallback.style.margin = "0";
   if (item.width > 260) {
     fallback.style.width = "100%";
   }
@@ -405,6 +419,51 @@ async function handleCopySavedCss() {
   }
 
   await copyText(buildCssSnippet(item), "CSS copied.");
+}
+
+async function handleContextDelete() {
+  if (!state.contextMenuId) {
+    return;
+  }
+
+  const targetId = state.contextMenuId;
+  hideSavedContextMenu();
+  await removeSavedItem(targetId);
+}
+
+function showSavedContextMenu(clientX, clientY, id) {
+  state.contextMenuId = id;
+  const menu = elements.savedContextMenu;
+  menu.hidden = false;
+  menu.style.left = `${Math.max(12, Math.min(clientX - 100, window.innerWidth - 148))}px`;
+  menu.style.top = `${Math.max(12, Math.min(clientY - 8, window.innerHeight - 56))}px`;
+}
+
+function hideSavedContextMenu() {
+  state.contextMenuId = null;
+  elements.savedContextMenu.hidden = true;
+}
+
+function handleGlobalPointerDown(event) {
+  if (elements.savedContextMenu.hidden) {
+    return;
+  }
+
+  if (!elements.savedContextMenu.contains(event.target)) {
+    hideSavedContextMenu();
+  }
+}
+
+function handleGlobalContextMenu(event) {
+  if (!event.target.closest(".saved-button")) {
+    hideSavedContextMenu();
+  }
+}
+
+function handleGlobalKeyDown(event) {
+  if (event.key === "Escape") {
+    hideSavedContextMenu();
+  }
 }
 
 async function removeSavedItem(id) {
