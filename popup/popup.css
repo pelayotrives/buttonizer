@@ -589,6 +589,32 @@ h3 {
   color: #ffffff;
 }
 
+.token {
+  font: inherit;
+}
+
+.token-selector,
+.token-tag {
+  color: #4fc1ff;
+}
+
+.token-property,
+.token-attribute {
+  color: #9cdcfe;
+}
+
+.token-value {
+  color: #ce9178;
+}
+
+.token-string {
+  color: #ce9178;
+}
+
+.token-punctuation {
+  color: #d4d4d4;
+}
+
 .info-block--code {
   gap: var(--space-2);
 }

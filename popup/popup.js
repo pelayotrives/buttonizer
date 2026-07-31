@@ -174,7 +174,7 @@ function renderInspector(item) {
   elements.inspectorRadius.textContent = item.styles.borderRadius || "0px";
   elements.inspectorShadow.textContent = item.styles.boxShadow || "None";
   elements.inspectorSelector.textContent = item.selector || "No selector available";
-  elements.inspectorMarkup.textContent = item.outerHtml || "<button></button>";
+  elements.inspectorMarkup.innerHTML = highlightHtmlSnippet(item.outerHtml || "<button></button>");
 
   renderPalette(elements.inspectorPalette, item.palette || []);
 }
@@ -245,7 +245,7 @@ function renderSavedDetails(item) {
   elements.savedDetailsBackground.textContent = `Background: ${item.styles.backgroundColor || "Transparent"}`;
   elements.savedDetailsBorder.textContent = `Border: ${formatBorder(item.styles)}`;
   elements.savedDetailsShadow.textContent = `Shadow: ${item.styles.boxShadow || "None"}`;
-  elements.savedDetailsCss.textContent = buildCssSnippet(item);
+  elements.savedDetailsCss.innerHTML = highlightCssSnippet(buildCssSnippet(item));
   renderPalette(elements.savedDetailsPalette, item.palette || []);
 }
 
@@ -526,6 +526,26 @@ function formatDomainLabel(pageUrl) {
   } catch (error) {
     return pageUrl;
   }
+}
+
+function highlightCssSnippet(source) {
+  let html = escapeHtml(source);
+
+  html = html.replace(/(\.[a-z0-9-]+)(\s*\{)/gi, '<span class="token token-selector">$1</span>$2');
+  html = html.replace(/(^|
+)(\s*)([a-z-]+)(:\s*)([^;]+)(;)/g, (_match, lineStart, indent, property, colon, value, semicolon) => {
+    return `${lineStart}${indent}<span class="token token-property">${property}</span>${colon}<span class="token token-value">${value}</span><span class="token token-punctuation">${semicolon}</span>`;
+  });
+  html = html.replace(/[{}]/g, '<span class="token token-punctuation">$&</span>');
+
+  return html;
+}
+
+function highlightHtmlSnippet(source) {
+  return escapeHtml(source).replace(/(&lt;\/?)([a-z0-9-]+)([^&]*?)(\/??&gt;)/gi, (_match, open, tagName, attrs, close) => {
+    const highlightedAttrs = attrs.replace(/([a-z:-]+)=(&quot;.*?&quot;)/gi, '<span class="token token-attribute">$1</span><span class="token token-punctuation">=</span><span class="token token-string">$2</span>');
+    return `<span class="token token-punctuation">${open}</span><span class="token token-tag">${tagName}</span>${highlightedAttrs}<span class="token token-punctuation">${close}</span>`;
+  });
 }
 
 function buildCssSnippet(item) {
