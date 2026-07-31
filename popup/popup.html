@@ -116,7 +116,7 @@
                 <p class="section-title">Markup</p>
                 <button id="copyMarkupButton" class="icon-button" type="button" aria-label="Copy markup">⧉</button>
               </div>
-              <pre id="inspectorMarkup" class="snippet-block__value snippet-block__value--code"></pre>
+              <pre id="inspectorMarkup" class="snippet-block__value snippet-block__value--code snippet-block__value--editor"></pre>
             </div>
           </article>
         </section>
@@ -137,7 +137,10 @@
         <div id="savedDetails" class="saved-details" hidden>
           <div class="saved-details__header">
             <h3 id="savedDetailsTitle"></h3>
-            <button id="removeSavedButton" class="ui-button ui-button--mini ui-button--secondary" type="button">Remove</button>
+            <div class="saved-details__actions">
+              <button id="copySavedCssButton" class="ui-button ui-button--mini ui-button--secondary" type="button">Copy</button>
+              <button id="removeSavedButton" class="ui-button ui-button--mini ui-button--secondary" type="button">Remove</button>
+            </div>
           </div>
           <div class="saved-details__meta">
             <p id="savedDetailsFont"></p>
@@ -146,6 +149,12 @@
             <p id="savedDetailsShadow"></p>
           </div>
           <div id="savedDetailsPalette" class="palette-row" aria-label="Saved palette"></div>
+          <div class="info-block info-block--code">
+            <div class="section-row">
+              <p class="section-title">CSS</p>
+            </div>
+            <pre id="savedDetailsCss" class="snippet-block__value snippet-block__value--code snippet-block__value--editor"></pre>
+          </div>
         </div>
       </section>
     </main>

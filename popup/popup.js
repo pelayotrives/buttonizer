@@ -19,6 +19,7 @@ const elements = {
   capturePrevButton: document.getElementById("capturePrevButton"),
   captureNextButton: document.getElementById("captureNextButton"),
   removeSavedButton: document.getElementById("removeSavedButton"),
+  copySavedCssButton: document.getElementById("copySavedCssButton"),
   copyMarkupButton: document.getElementById("copyMarkupButton"),
   statusMessage: document.getElementById("statusMessage"),
   toastMessage: document.getElementById("toastMessage"),
@@ -40,6 +41,7 @@ const elements = {
   inspectorPalette: document.getElementById("inspectorPalette"),
   inspectorSelector: document.getElementById("inspectorSelector"),
   inspectorMarkup: document.getElementById("inspectorMarkup"),
+  savedDetailsCss: document.getElementById("savedDetailsCss"),
   savedEmpty: document.getElementById("savedEmpty"),
   savedLibrary: document.getElementById("savedLibrary"),
   savedDetails: document.getElementById("savedDetails"),
@@ -71,6 +73,7 @@ function bindEvents() {
   elements.capturePrevButton.addEventListener("click", () => moveDetected(-1));
   elements.captureNextButton.addEventListener("click", () => moveDetected(1));
   elements.removeSavedButton.addEventListener("click", handleRemoveSelectedSaved);
+  elements.copySavedCssButton.addEventListener("click", handleCopySavedCss);
   elements.copyMarkupButton.addEventListener("click", handleCopyMarkup);
 }
 
@@ -181,6 +184,7 @@ function renderSavedLibrary() {
   elements.savedEmpty.hidden = state.savedButtons.length > 0;
   elements.savedLibrary.hidden = state.savedButtons.length === 0;
   elements.savedDetails.hidden = state.savedButtons.length === 0;
+  elements.copySavedCssButton.disabled = state.savedButtons.length === 0;
 
   if (state.savedButtons.length === 0) {
     state.selectedSavedId = null;
@@ -241,6 +245,7 @@ function renderSavedDetails(item) {
   elements.savedDetailsBackground.textContent = `Background: ${item.styles.backgroundColor || "Transparent"}`;
   elements.savedDetailsBorder.textContent = `Border: ${formatBorder(item.styles)}`;
   elements.savedDetailsShadow.textContent = `Shadow: ${item.styles.boxShadow || "None"}`;
+  elements.savedDetailsCss.textContent = buildCssSnippet(item);
   renderPalette(elements.savedDetailsPalette, item.palette || []);
 }
 
@@ -345,6 +350,15 @@ async function handleRemoveSelectedSaved() {
   }
 
   await removeSavedItem(state.selectedSavedId);
+}
+
+async function handleCopySavedCss() {
+  const item = state.savedButtons.find((entry) => entry.id === state.selectedSavedId);
+  if (!item) {
+    return;
+  }
+
+  await copyText(buildCssSnippet(item), "CSS copied.");
 }
 
 async function removeSavedItem(id) {
@@ -512,6 +526,36 @@ function formatDomainLabel(pageUrl) {
   } catch (error) {
     return pageUrl;
   }
+}
+
+function buildCssSnippet(item) {
+  const selectorName = `.buttonizer-${toKebabCase(item.label || "button")}`;
+  const rules = [
+    ["font-family", normalizeFontFamily(item.styles.fontFamily)],
+    ["font-size", item.styles.fontSize || "14px"],
+    ["font-weight", item.styles.fontWeight || "400"],
+    ["color", item.styles.color || "inherit"],
+    ["background-color", item.styles.backgroundColor || "transparent"],
+    ["border", formatBorder(item.styles)],
+    ["border-radius", item.styles.borderRadius || "0px"],
+    ["box-shadow", item.styles.boxShadow || "none"],
+    ["padding", item.styles.padding || "10px 16px"],
+  ];
+
+  const body = rules.map(([property, value]) => `  ${property}: ${value};`).join("\n");
+  return `${selectorName} {\n${body}\n}`;
+}
+
+function normalizeFontFamily(fontFamily) {
+  const value = String(fontFamily || "Arial, sans-serif").trim();
+  return /["']/.test(value) ? value : value.replace(/([^,]+)/g, '"$1"').replace(/"\s+/g, '"').replace(/\s+"/g, '"');
+}
+
+function toKebabCase(value) {
+  return String(value || "button")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "button";
 }
 
 function compactFontFamily(fontFamily) {

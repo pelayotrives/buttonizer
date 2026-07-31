@@ -110,16 +110,16 @@ h3 {
   min-width: 200px;
   max-width: calc(360px - 32px);
   padding: 12px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.4);
+  border: 0;
   border-radius: 14px;
-  background: rgba(0, 21, 36, 0.86);
-  backdrop-filter: blur(18px) saturate(1.08);
-  -webkit-backdrop-filter: blur(18px) saturate(1.08);
+  background: rgba(21, 97, 109, 0.5);
+  backdrop-filter: blur(18px) saturate(1.12);
+  -webkit-backdrop-filter: blur(18px) saturate(1.12);
   color: #ffffff;
   text-align: center;
   font-size: var(--text-sm);
   line-height: 1.25;
-  box-shadow: 0 20px 34px rgba(0, 21, 36, 0.24);
+  box-shadow: 0 20px 34px rgba(0, 21, 36, 0.18);
   pointer-events: none;
   opacity: 0;
   transition:
