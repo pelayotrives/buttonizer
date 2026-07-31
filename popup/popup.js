@@ -162,8 +162,7 @@ function renderCaptureInspector() {
 function renderInspector(item) {
   elements.inspectorTitle.textContent = item.label || "Unnamed button";
   elements.inspectorSubtitle.textContent = `${item.pageTitle || "Unknown page"} · ${item.hostname || "Local page"}`;
-  elements.inspectorPreview.textContent = item.label || "Button";
-  applyPreviewStyle(elements.inspectorPreview, item.styles, item.width, item.height);
+  renderPreviewSurface(item);
 
   elements.inspectorSize.textContent = `${item.width}px × ${item.height}px`;
   elements.inspectorFont.textContent = compactFontFamily(item.styles.fontFamily);
@@ -201,17 +200,24 @@ function renderSavedLibrary() {
     const wrapper = document.createElement("div");
     wrapper.className = "saved-button-wrap";
 
-    const previewButton = document.createElement("button");
+    const previewButton = document.createElement("div");
     previewButton.className = "saved-button";
     if (item.id === state.selectedSavedId) {
       previewButton.classList.add("is-active");
     }
-    previewButton.type = "button";
-    previewButton.textContent = item.label || "Button";
-    applyPreviewStyle(previewButton, item.styles, item.width, item.height);
+    previewButton.setAttribute("role", "button");
+    previewButton.tabIndex = 0;
+    renderSavedButtonSurface(previewButton, item);
     previewButton.addEventListener("click", () => {
       state.selectedSavedId = item.id;
       renderSavedLibrary();
+    });
+    previewButton.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        state.selectedSavedId = item.id;
+        renderSavedLibrary();
+      }
     });
 
     const removeButton = document.createElement("button");
@@ -247,6 +253,46 @@ function renderSavedDetails(item) {
   elements.savedDetailsShadow.textContent = `Shadow: ${item.styles.boxShadow || "None"}`;
   elements.savedDetailsCss.innerHTML = highlightCssSnippet(buildCssSnippet(item));
   renderPalette(elements.savedDetailsPalette, item.palette || []);
+}
+
+function renderPreviewSurface(item) {
+  if (item.previewHtml) {
+    elements.inspectorPreview.innerHTML = item.previewHtml;
+    return;
+  }
+
+  const fallback = document.createElement("button");
+  fallback.type = "button";
+  fallback.textContent = item.label || "Button";
+  applyPreviewStyle(fallback, item.styles, item.width, item.height);
+  elements.inspectorPreview.replaceChildren(fallback);
+}
+
+function renderSavedButtonSurface(container, item) {
+  if (item.previewHtml) {
+    container.innerHTML = item.previewHtml;
+    const root = container.firstElementChild;
+    if (root) {
+      root.style.maxWidth = "100%";
+      root.style.minWidth = "0";
+      root.style.boxSizing = "border-box";
+      if (item.width > 260) {
+        root.style.width = "100%";
+      }
+    }
+    return;
+  }
+
+  const fallback = document.createElement("button");
+  fallback.type = "button";
+  fallback.textContent = item.label || "Button";
+  applyPreviewStyle(fallback, item.styles, item.width, item.height);
+  fallback.style.maxWidth = "100%";
+  fallback.style.minWidth = "0";
+  if (item.width > 260) {
+    fallback.style.width = "100%";
+  }
+  container.replaceChildren(fallback);
 }
 
 function moveDetected(direction) {
@@ -501,6 +547,7 @@ function normalizeButtonRecord(item) {
     width: Math.round(item.width || 0),
     height: Math.round(item.height || 0),
     palette: Array.isArray(item.palette) ? item.palette : [],
+    previewHtml: item.previewHtml || "",
     styles: {
       fontFamily: item.styles?.fontFamily || "Arial, sans-serif",
       fontSize: item.styles?.fontSize || "14px",
@@ -761,6 +808,43 @@ function scanCurrentPageButtons() {
     return rawLabel.replace(/\s+/g, " ").trim() || `Button ${index + 1}`;
   }
 
+  function serializeStyledSubtree(root) {
+    const clone = cloneWithComputedStyles(root, 0);
+    return clone ? clone.outerHTML : root.outerHTML;
+  }
+
+  function cloneWithComputedStyles(node, depth) {
+    if (!(node instanceof Element) || depth > 6) {
+      return null;
+    }
+
+    const clone = node.cloneNode(false);
+    const computedStyle = window.getComputedStyle(node);
+    clone.setAttribute("style", serializeComputedStyle(computedStyle));
+
+    const children = Array.from(node.childNodes).slice(0, 40);
+    children.forEach((child) => {
+      if (child.nodeType === Node.TEXT_NODE) {
+        clone.appendChild(document.createTextNode(child.textContent || ""));
+        return;
+      }
+
+      const styledChild = cloneWithComputedStyles(child, depth + 1);
+      if (styledChild) {
+        clone.appendChild(styledChild);
+      }
+    });
+
+    return clone;
+  }
+
+  function serializeComputedStyle(style) {
+    const properties = Array.from(style);
+    return properties
+      .map((property) => `${property}:${style.getPropertyValue(property)};`)
+      .join("");
+  }
+
   const candidates = Array.from(
     document.querySelectorAll("button, input[type='button'], input[type='submit'], [role='button']")
   );
@@ -794,7 +878,8 @@ function scanCurrentPageButtons() {
         pageUrl: window.location.href,
         hostname: window.location.hostname,
         selector: buildSelector(node),
-        outerHtml: node.outerHTML.slice(0, 600),
+        outerHtml: node.outerHTML.slice(0, 1200),
+        previewHtml: serializeStyledSubtree(node),
         width: rect.width,
         height: rect.height,
         palette: [backgroundColor, textColor, borderColor, shadowColor],

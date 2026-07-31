@@ -498,9 +498,20 @@ h3 {
   border: 0;
   border-radius: var(--radius-md);
   background: rgba(0, 21, 36, 0.04);
+  overflow: auto;
 }
 
-.preview-stage__button {
+.preview-stage__surface {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 100%;
+  overflow: auto;
+}
+
+.preview-stage__surface > * {
+  flex: 0 0 auto;
   max-width: 100%;
 }
 
@@ -639,15 +650,28 @@ h3 {
   display: flex;
   align-items: center;
   gap: var(--space-1);
+  width: 100%;
+  min-width: 0;
 }
 
 .saved-button {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
   min-height: 30px;
-  padding: 0 12px;
+  max-width: calc(100% - 28px);
+  padding: 0;
   border: 1px solid var(--color-border-strong);
   border-radius: 9999px;
   font-size: var(--text-sm);
   font-weight: 700;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.saved-button > * {
+  max-width: 100%;
 }
 
 .saved-button.is-active {
