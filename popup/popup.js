@@ -541,10 +541,84 @@ function highlightCssSnippet(source) {
 }
 
 function highlightHtmlSnippet(source) {
-  return escapeHtml(source).replace(/(&lt;\/?)([a-z0-9-]+)([^&]*?)(\/??&gt;)/gi, (_match, open, tagName, attrs, close) => {
-    const highlightedAttrs = attrs.replace(/([a-z:-]+)=(&quot;.*?&quot;)/gi, '<span class="token token-attribute">$1</span><span class="token token-punctuation">=</span><span class="token token-string">$2</span>');
-    return `<span class="token token-punctuation">${open}</span><span class="token token-tag">${tagName}</span>${highlightedAttrs}<span class="token token-punctuation">${close}</span>`;
-  });
+  const input = String(source || "");
+  const tagPattern = /<[^>]+>/g;
+  let lastIndex = 0;
+  let result = "";
+
+  for (const match of input.matchAll(tagPattern)) {
+    const [rawTag] = match;
+    const matchIndex = match.index || 0;
+
+    if (matchIndex > lastIndex) {
+      result += escapeHtml(input.slice(lastIndex, matchIndex));
+    }
+
+    result += highlightHtmlTag(rawTag);
+    lastIndex = matchIndex + rawTag.length;
+  }
+
+  if (lastIndex < input.length) {
+    result += escapeHtml(input.slice(lastIndex));
+  }
+
+  return result;
+}
+
+function highlightHtmlTag(rawTag) {
+  const isClosing = /^<\//.test(rawTag);
+  const isSelfClosing = /\/>$/.test(rawTag);
+  const tagNameMatch = rawTag.match(/^<\/?\s*([a-z0-9-]+)/i);
+  const tagName = tagNameMatch ? tagNameMatch[1] : "div";
+  const open = isClosing ? "&lt;/" : "&lt;";
+  const close = isSelfClosing ? "/&gt;" : "&gt;";
+
+  if (isClosing) {
+    return `<span class="token token-punctuation">${open}</span><span class="token token-tag">${escapeHtml(tagName)}</span><span class="token token-punctuation">&gt;</span>`;
+  }
+
+  const attrSource = rawTag
+    .replace(/^<\s*[a-z0-9-]+/i, "")
+    .replace(/\/?\s*>$/, "")
+    .trim();
+
+  const highlightedAttrs = attrSource
+    ? ` ${highlightHtmlAttributes(attrSource)}`
+    : "";
+
+  return `<span class="token token-punctuation">${open}</span><span class="token token-tag">${escapeHtml(tagName)}</span>${highlightedAttrs}<span class="token token-punctuation">${close}</span>`;
+}
+
+function highlightHtmlAttributes(source) {
+  const attrPattern = /([:@a-zA-Z0-9_-]+)(\s*=\s*("[^"]*"|'[^']*'|[^\s"'=<>`]+))?/g;
+  const parts = [];
+  let lastIndex = 0;
+
+  for (const match of source.matchAll(attrPattern)) {
+    const [rawAttr, name, assignment = ""] = match;
+    const matchIndex = match.index || 0;
+
+    if (matchIndex > lastIndex) {
+      parts.push(escapeHtml(source.slice(lastIndex, matchIndex)));
+    }
+
+    let rendered = `<span class="token token-attribute">${escapeHtml(name)}</span>`;
+
+    if (assignment) {
+      const eqIndex = assignment.indexOf("=");
+      const value = assignment.slice(eqIndex + 1).trim();
+      rendered += `<span class="token token-punctuation">=</span><span class="token token-string">${escapeHtml(value)}</span>`;
+    }
+
+    parts.push(rendered);
+    lastIndex = matchIndex + rawAttr.length;
+  }
+
+  if (lastIndex < source.length) {
+    parts.push(escapeHtml(source.slice(lastIndex)));
+  }
+
+  return parts.join("");
 }
 
 function buildCssSnippet(item) {
