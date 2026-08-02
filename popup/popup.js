@@ -851,9 +851,17 @@ function normalizeFontFamily(fontFamily) {
     "-apple-system",
   ]);
 
+  function cleanFamilyPart(part) {
+    return String(part || "")
+      .replace(/;/g, "")
+      .replace(/^[\s"']+/, "")
+      .replace(/[\s"']+$/, "")
+      .trim();
+  }
+
   const families = String(fontFamily || "Arial, sans-serif")
     .split(",")
-    .map((part) => part.trim().replace(/^[;\s"']+/, "").replace(/[;\s"']+$/, ""))
+    .map(cleanFamilyPart)
     .filter(Boolean)
     .filter((part) => !/\bfallback\b/i.test(part));
 
@@ -946,11 +954,14 @@ function scanCurrentPageButtons() {
     return parts.join(" > ");
   }
 
+  function getVisibleButtonLabel(node) {
+    const rawLabel = node.innerText || node.textContent || node.value || "";
+    return rawLabel.replace(/\s+/g, " ").trim();
+  }
+
   function getButtonLabel(node, index) {
     const rawLabel =
-      node.innerText ||
-      node.textContent ||
-      node.value ||
+      getVisibleButtonLabel(node) ||
       node.getAttribute("aria-label") ||
       node.getAttribute("title") ||
       `Button ${index + 1}`;
@@ -1047,14 +1058,17 @@ function scanCurrentPageButtons() {
     return hasBackground || hasBorder || hasShadow;
   }
 
-  function isLowValueButton(node, label, rect, computedStyle) {
+  function isLowValueButton(node, label, visibleLabel, rect, computedStyle) {
     const normalized = normalizeButtonLabel(label);
+    const normalizedVisible = normalizeButtonLabel(visibleLabel);
     const hasGraphic = Boolean(node.querySelector("svg, img"));
     const looksTiny = rect.width <= 60 && rect.height <= 60;
     const looksUtilitySized = rect.width <= 88 && rect.height <= 72;
-    const textLength = normalized.replace(/[^a-z0-9]/gi, "").length;
-    const symbolOnly = normalized.length <= 1 && !/[a-z0-9]/i.test(normalized);
+    const textLength = normalized.replace(/[^\p{L}\p{N}]/gu, "").length;
+    const visibleTextLength = normalizedVisible.replace(/[^\p{L}\p{N}]/gu, "").length;
+    const symbolOnly = normalized.length <= 1 && !/[\p{L}\p{N}]/u.test(normalized);
     const hasChrome = hasVisualChrome(computedStyle);
+    const isInputButton = node.tagName === "INPUT";
     const disposable = [
       "close",
       "cerrar",
@@ -1071,6 +1085,10 @@ function scanCurrentPageButtons() {
       "more",
       "more options",
       "search",
+      "previous",
+      "next",
+      "back",
+      "forward",
       "x",
     ].includes(normalized);
 
@@ -1079,11 +1097,14 @@ function scanCurrentPageButtons() {
     if (!normalized && !hasGraphic) return true;
     if (symbolOnly && looksTiny) return true;
     if (disposable && looksUtilitySized) return true;
-    if (textLength <= 2 && looksTiny && !hasGraphic) return true;
-    if (hasGraphic && textLength <= 3 && !hasChrome) return true;
-    if (!hasChrome && textLength <= 2) return true;
     if (node.disabled && looksUtilitySized) return true;
-    if (node.getAttribute("role") === "button" && !hasChrome && textLength <= 8) return true;
+    if (!isInputButton && visibleTextLength === 0 && hasGraphic) return true;
+    if (!isInputButton && visibleTextLength === 0 && !hasChrome) return true;
+    if (!hasChrome && visibleTextLength <= 2) return true;
+    if (visibleTextLength <= 1 && looksUtilitySized) return true;
+    if (hasGraphic && visibleTextLength <= 2) return true;
+    if (node.getAttribute("role") === "button" && visibleTextLength <= 2) return true;
+    if (textLength <= 2 && looksTiny && !hasGraphic) return true;
     return false;
   }
 
@@ -1115,6 +1136,7 @@ function scanCurrentPageButtons() {
     .filter((node) => {
       const rect = node.getBoundingClientRect();
       const computedStyle = window.getComputedStyle(node);
+      const visibleLabel = getVisibleButtonLabel(node);
       const label = getButtonLabel(node, 0);
       return (
         rect.width > 0 &&
@@ -1122,7 +1144,7 @@ function scanCurrentPageButtons() {
         computedStyle.visibility !== "hidden" &&
         computedStyle.display !== "none" &&
         computedStyle.opacity !== "0" &&
-        !isLowValueButton(node, label, rect, computedStyle)
+        !isLowValueButton(node, label, visibleLabel, rect, computedStyle)
       );
     })
     .slice(0, 120);
@@ -1136,6 +1158,7 @@ function scanCurrentPageButtons() {
       const shadowColor = extractShadowColor(computedStyle.boxShadow);
       const measuredWidth = Math.round(rect.width);
       const measuredHeight = Math.round(rect.height);
+      const visibleLabel = getVisibleButtonLabel(node);
       const label = getButtonLabel(node, index);
       const normalizedLabel = normalizeButtonLabel(label);
 
