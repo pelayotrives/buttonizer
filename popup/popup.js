@@ -851,36 +851,36 @@ function normalizeFontFamily(fontFamily) {
     "-apple-system",
   ]);
 
-  function cleanFamilyPart(part) {
-    return String(part || "")
+  const raw = String(fontFamily || "Arial, sans-serif").replace(/;/g, "");
+  const tokens = raw.match(/"[^"]+"|'[^']+'|[^,]+/g) || [];
+  const uniqueFamilies = [];
+  const seen = new Set();
+
+  tokens.forEach((token) => {
+    const cleaned = String(token)
       .replace(/;/g, "")
       .replace(/^[\s"']+/, "")
       .replace(/[\s"']+$/, "")
       .trim();
-  }
 
-  const families = String(fontFamily || "Arial, sans-serif")
-    .split(",")
-    .map(cleanFamilyPart)
-    .filter(Boolean)
-    .filter((part) => !/\bfallback\b/i.test(part));
+    if (!cleaned || /\bfallback\b/i.test(cleaned)) {
+      return;
+    }
 
-  const uniqueFamilies = [];
-  const seen = new Set();
-
-  families.forEach((part) => {
-    const normalized = part.toLowerCase();
+    const normalized = cleaned.toLowerCase();
     if (seen.has(normalized)) {
       return;
     }
 
     seen.add(normalized);
-    uniqueFamilies.push(part);
+    uniqueFamilies.push(cleaned);
   });
 
   return uniqueFamilies
     .map((part) => (genericFamilies.has(part.toLowerCase()) || /^[a-z-]+$/i.test(part) ? part : `"${part}"`))
-    .join(", ");
+    .join(", ")
+    .replace(/"\s*;/g, '"')
+    .trim();
 }
 
 function toKebabCase(value) {
@@ -1098,13 +1098,14 @@ function scanCurrentPageButtons() {
     if (symbolOnly && looksTiny) return true;
     if (disposable && looksUtilitySized) return true;
     if (node.disabled && looksUtilitySized) return true;
-    if (!isInputButton && visibleTextLength === 0 && hasGraphic) return true;
-    if (!isInputButton && visibleTextLength === 0 && !hasChrome) return true;
-    if (!hasChrome && visibleTextLength <= 2) return true;
+
+    if (!isInputButton && visibleTextLength === 0) return true;
+    if (!hasChrome && visibleTextLength <= 3) return true;
     if (visibleTextLength <= 1 && looksUtilitySized) return true;
-    if (hasGraphic && visibleTextLength <= 2) return true;
-    if (node.getAttribute("role") === "button" && visibleTextLength <= 2) return true;
+    if (hasGraphic && visibleTextLength <= 3) return true;
+    if (node.getAttribute("role") === "button" && visibleTextLength <= 3) return true;
     if (textLength <= 2 && looksTiny && !hasGraphic) return true;
+
     return false;
   }
 
