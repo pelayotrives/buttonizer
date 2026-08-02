@@ -178,7 +178,7 @@ function renderCaptureInspector() {
 function renderInspector(item) {
   elements.inspectorTitle.textContent = item.label || "Unnamed button";
   elements.inspectorSubtitle.textContent = `${item.pageTitle || "Unknown page"} · ${item.hostname || "Local page"}`;
-  renderPreviewSurface(item);
+  renderPreviewSurface(item, true);
 
   elements.inspectorSize.textContent = `${item.width}px × ${item.height}px`;
   elements.inspectorFont.textContent = compactFontFamily(item.styles.fontFamily);
@@ -238,9 +238,14 @@ function renderSavedDetails(item) {
   renderPalette(elements.savedDetailsPalette, item.palette || []);
 }
 
-function renderPreviewSurface(item) {
+function renderPreviewSurface(item, fitToStage = false) {
   if (item.previewHtml) {
     elements.inspectorPreview.innerHTML = item.previewHtml;
+    const root = elements.inspectorPreview.firstElementChild;
+    if (root && fitToStage) {
+      preparePreviewNode(root);
+      fitPreviewToStage(elements.inspectorPreview, root, item);
+    }
     return;
   }
 
@@ -249,6 +254,10 @@ function renderPreviewSurface(item) {
   fallback.textContent = item.label || "Button";
   applyPreviewStyle(fallback, item.styles, item.width, item.height);
   elements.inspectorPreview.replaceChildren(fallback);
+  if (fitToStage) {
+    preparePreviewNode(fallback);
+    fitPreviewToStage(elements.inspectorPreview, fallback, item);
+  }
 }
 
 function renderSavedButtonSurface(container, item, fitToStage = false) {
@@ -256,13 +265,9 @@ function renderSavedButtonSurface(container, item, fitToStage = false) {
     container.innerHTML = item.previewHtml;
     const root = container.firstElementChild;
     if (root) {
-      root.style.maxWidth = "none";
-      root.style.minWidth = "0";
-      root.style.boxSizing = "border-box";
-      root.style.margin = "0";
-      root.style.flexShrink = "0";
+      preparePreviewNode(root);
       if (fitToStage) {
-        fitSavedPreviewToStage(container, root, item);
+        fitPreviewToStage(container, root, item);
       }
     }
     return;
@@ -272,28 +277,42 @@ function renderSavedButtonSurface(container, item, fitToStage = false) {
   fallback.type = "button";
   fallback.textContent = item.label || "Button";
   applyPreviewStyle(fallback, item.styles, item.width, item.height);
-  fallback.style.maxWidth = "none";
-  fallback.style.minWidth = "0";
-  fallback.style.margin = "0";
+  preparePreviewNode(fallback);
   if (fitToStage) {
     container.replaceChildren(fallback);
-    fitSavedPreviewToStage(container, fallback, item);
+    fitPreviewToStage(container, fallback, item);
     return;
   }
   container.replaceChildren(fallback);
 }
 
-function fitSavedPreviewToStage(container, root, item) {
+function preparePreviewNode(root) {
+  root.style.maxWidth = "none";
+  root.style.minWidth = "0";
+  root.style.boxSizing = "border-box";
+  root.style.margin = "0";
+  root.style.flexShrink = "0";
+}
+
+function fitPreviewToStage(container, root, item) {
   const naturalWidth = Math.max(1, Math.round(item.width || root.getBoundingClientRect().width || 1));
   const naturalHeight = Math.max(1, Math.round(item.height || root.getBoundingClientRect().height || 1));
-  const availableWidth = Math.max(120, container.clientWidth - 8);
-  const scale = Math.min(1, availableWidth / naturalWidth);
 
-  root.style.width = `${naturalWidth}px`;
-  root.style.transform = `scale(${scale})`;
-  root.style.transformOrigin = "center center";
-  root.style.display = root.style.display || "inline-flex";
-  container.style.minHeight = `${Math.max(48, Math.round(naturalHeight * scale))}px`;
+  window.requestAnimationFrame(() => {
+    const availableWidth = Math.max(120, container.clientWidth - 16);
+    const availableHeight = Math.max(56, (container.clientHeight || naturalHeight) - 16);
+    const scale = Math.min(1, availableWidth / naturalWidth, availableHeight / naturalHeight);
+
+    root.style.width = `${naturalWidth}px`;
+    root.style.maxWidth = "none";
+    root.style.transform = `scale(${scale})`;
+    root.style.transformOrigin = "center center";
+    root.style.display = root.style.display && root.style.display !== "inline" ? root.style.display : "inline-flex";
+    root.style.alignSelf = "center";
+    container.style.minHeight = `${Math.max(64, Math.round(naturalHeight * scale) + 8)}px`;
+    container.scrollLeft = 0;
+    container.scrollTop = 0;
+  });
 }
 
 function moveSaved(direction) {
@@ -815,11 +834,28 @@ function buildCssSnippet(item) {
 }
 
 function normalizeFontFamily(fontFamily) {
+  const genericFamilies = new Set([
+    "serif",
+    "sans-serif",
+    "monospace",
+    "cursive",
+    "fantasy",
+    "system-ui",
+    "ui-serif",
+    "ui-sans-serif",
+    "ui-monospace",
+    "ui-rounded",
+    "emoji",
+    "math",
+    "fangsong",
+    "-apple-system",
+  ]);
+
   return String(fontFamily || "Arial, sans-serif")
     .split(",")
-    .map((part) => part.trim())
+    .map((part) => part.trim().replace(/^[;\s"']+/, "").replace(/[;\s"']+$/, ""))
     .filter(Boolean)
-    .map((part) => (/^[a-z-]+$/i.test(part) ? part : `"${part.replace(/["']/g, "")}"`))
+    .map((part) => (genericFamilies.has(part.toLowerCase()) || /^[a-z-]+$/i.test(part) ? part : `"${part}"`))
     .join(", ");
 }
 
@@ -831,7 +867,11 @@ function toKebabCase(value) {
 }
 
 function compactFontFamily(fontFamily) {
-  return String(fontFamily || "Unknown font").split(",")[0].replace(/["']/g, "").trim();
+  return String(fontFamily || "Unknown font")
+    .split(",")[0]
+    .replace(/^[;\s"']+/, "")
+    .replace(/[;\s"']+$/, "")
+    .trim();
 }
 
 function formatBorder(styles) {
@@ -896,12 +936,20 @@ function scanCurrentPageButtons() {
   function getButtonLabel(node, index) {
     const rawLabel =
       node.innerText ||
+      node.textContent ||
       node.value ||
       node.getAttribute("aria-label") ||
       node.getAttribute("title") ||
       `Button ${index + 1}`;
 
     return rawLabel.replace(/\s+/g, " ").trim() || `Button ${index + 1}`;
+  }
+
+  function getClassSignature(node) {
+    return Array.from(node.classList || [])
+      .filter(Boolean)
+      .sort()
+      .join(".");
   }
 
   function serializeStyledSubtree(root) {
@@ -941,24 +989,96 @@ function scanCurrentPageButtons() {
       .join("");
   }
 
+  function normalizeButtonLabel(label) {
+    return String(label || "").replace(/\s+/g, " ").trim().toLowerCase();
+  }
+
+  function isAriaHidden(node) {
+    return node.closest("[aria-hidden='true'], [hidden], template") !== null;
+  }
+
+  function nodeSpecificityScore(node) {
+    let score = 0;
+    if (node.tagName === "BUTTON") score += 4;
+    if (node.id) score += 2;
+    if (node.classList) score += Math.min(2, node.classList.length);
+    if (node.querySelector("svg, img")) score += 1;
+    if (node.getAttribute("aria-label")) score += 1;
+    return score;
+  }
+
+  function isLowValueButton(node, label, rect) {
+    const normalized = normalizeButtonLabel(label);
+    const hasGraphic = Boolean(node.querySelector("svg, img"));
+    const looksTiny = rect.width <= 60 && rect.height <= 60;
+    const looksUtilitySized = rect.width <= 88 && rect.height <= 72;
+    const textLength = normalized.replace(/[^a-z0-9]/gi, "").length;
+    const symbolOnly = normalized.length <= 1 && !/[a-z0-9]/i.test(normalized);
+    const disposable = [
+      "close",
+      "cerrar",
+      "dismiss",
+      "clear",
+      "borrar",
+      "delete",
+      "remove",
+      "cancel",
+      "skip",
+      "dismiss ad",
+      "x",
+    ].includes(normalized);
+
+    if (rect.width < 20 || rect.height < 20) return true;
+    if (isAriaHidden(node)) return true;
+    if (!normalized && !hasGraphic) return true;
+    if (symbolOnly && looksTiny) return true;
+    if (disposable && looksUtilitySized) return true;
+    if (textLength <= 2 && looksTiny && !hasGraphic) return true;
+    if (node.disabled && looksUtilitySized) return true;
+    return false;
+  }
+
+  function buildDedupeKey(node, label, rect, computedStyle) {
+    const roundedWidth = Math.max(1, Math.round(rect.width / 4) * 4);
+    const roundedHeight = Math.max(1, Math.round(rect.height / 4) * 4);
+    const background = computedStyle.backgroundColor || "transparent";
+    const color = computedStyle.color || "inherit";
+    const radius = computedStyle.borderRadius || "0px";
+    const weight = computedStyle.fontWeight || "400";
+
+    return [
+      normalizeButtonLabel(label),
+      node.tagName.toLowerCase(),
+      node.getAttribute("type") || "",
+      getClassSignature(node),
+      roundedWidth,
+      roundedHeight,
+      background,
+      color,
+      radius,
+      weight,
+    ].join("|");
+  }
+
   const candidates = Array.from(
     document.querySelectorAll("button, input[type='button'], input[type='submit'], [role='button']")
-  );
-
-  const buttons = candidates
+  )
     .filter((node) => {
       const rect = node.getBoundingClientRect();
       const computedStyle = window.getComputedStyle(node);
+      const label = getButtonLabel(node, 0);
       return (
         rect.width > 0 &&
         rect.height > 0 &&
         computedStyle.visibility !== "hidden" &&
         computedStyle.display !== "none" &&
-        computedStyle.opacity !== "0"
+        computedStyle.opacity !== "0" &&
+        !isLowValueButton(node, label, rect)
       );
     })
-    .slice(0, 80)
-    .map((node, index) => {
+    .slice(0, 120);
+
+  const candidateRecords = candidates.map((node, index) => {
       const rect = node.getBoundingClientRect();
       const computedStyle = window.getComputedStyle(node);
       const backgroundColor = computedStyle.backgroundColor;
@@ -967,53 +1087,77 @@ function scanCurrentPageButtons() {
       const shadowColor = extractShadowColor(computedStyle.boxShadow);
       const measuredWidth = Math.round(rect.width);
       const measuredHeight = Math.round(rect.height);
+      const label = getButtonLabel(node, index);
+      const normalizedLabel = normalizeButtonLabel(label);
 
       return {
-        label: getButtonLabel(node, index),
-        pageTitle: document.title || "Untitled page",
-        pageUrl: window.location.href,
-        hostname: window.location.hostname,
-        selector: buildSelector(node),
-        outerHtml: node.outerHTML.slice(0, 1200),
-        previewHtml: serializeStyledSubtree(node),
-        width: rect.width,
-        height: rect.height,
-        palette: [backgroundColor, textColor, borderColor, shadowColor],
-        styles: {
-          fontFamily: computedStyle.fontFamily,
-          fontSize: computedStyle.fontSize,
-          fontWeight: computedStyle.fontWeight,
-          lineHeight: computedStyle.lineHeight,
-          color: textColor,
-          background: computedStyle.background,
-          backgroundColor,
-          backgroundImage: computedStyle.backgroundImage,
-          backgroundPosition: computedStyle.backgroundPosition,
-          backgroundSize: computedStyle.backgroundSize,
-          backgroundRepeat: computedStyle.backgroundRepeat,
-          border: computedStyle.border,
-          borderColor,
-          borderWidth: computedStyle.borderWidth,
-          borderStyle: computedStyle.borderStyle,
-          borderRadius: computedStyle.borderRadius,
-          boxShadow: computedStyle.boxShadow,
-          outline: computedStyle.outline,
-          outlineOffset: computedStyle.outlineOffset,
-          padding: computedStyle.padding,
-          display: computedStyle.display,
-          alignItems: computedStyle.alignItems,
-          justifyContent: computedStyle.justifyContent,
-          gap: computedStyle.gap,
-          textAlign: computedStyle.textAlign,
-          minWidth: computedStyle.minWidth !== '0px' ? computedStyle.minWidth : `${measuredWidth}px`,
-          minHeight: computedStyle.minHeight !== '0px' ? computedStyle.minHeight : `${measuredHeight}px`,
-          width: computedStyle.width,
-          height: computedStyle.height,
-          letterSpacing: computedStyle.letterSpacing,
-          textTransform: computedStyle.textTransform,
+        specificity: nodeSpecificityScore(node),
+        dedupeKey: buildDedupeKey(node, label, rect, computedStyle),
+        record: {
+          label,
+          pageTitle: document.title || "Untitled page",
+          pageUrl: window.location.href,
+          hostname: window.location.hostname,
+          selector: buildSelector(node),
+          outerHtml: node.outerHTML.slice(0, 1200),
+          previewHtml: serializeStyledSubtree(node),
+          width: rect.width,
+          height: rect.height,
+          palette: [backgroundColor, textColor, borderColor, shadowColor],
+          styles: {
+            fontFamily: computedStyle.fontFamily,
+            fontSize: computedStyle.fontSize,
+            fontWeight: computedStyle.fontWeight,
+            lineHeight: computedStyle.lineHeight,
+            color: textColor,
+            background: computedStyle.background,
+            backgroundColor,
+            backgroundImage: computedStyle.backgroundImage,
+            backgroundPosition: computedStyle.backgroundPosition,
+            backgroundSize: computedStyle.backgroundSize,
+            backgroundRepeat: computedStyle.backgroundRepeat,
+            border: computedStyle.border,
+            borderColor,
+            borderWidth: computedStyle.borderWidth,
+            borderStyle: computedStyle.borderStyle,
+            borderRadius: computedStyle.borderRadius,
+            boxShadow: computedStyle.boxShadow,
+            outline: computedStyle.outline,
+            outlineOffset: computedStyle.outlineOffset,
+            padding: computedStyle.padding,
+            display: computedStyle.display,
+            alignItems: computedStyle.alignItems,
+            justifyContent: computedStyle.justifyContent,
+            gap: computedStyle.gap,
+            textAlign: computedStyle.textAlign,
+            minWidth: computedStyle.minWidth !== '0px' ? computedStyle.minWidth : `${measuredWidth}px`,
+            minHeight: computedStyle.minHeight !== '0px' ? computedStyle.minHeight : `${measuredHeight}px`,
+            width: computedStyle.width,
+            height: computedStyle.height,
+            letterSpacing: computedStyle.letterSpacing,
+            textTransform: computedStyle.textTransform,
+          },
         },
       };
     });
+
+  const deduped = [];
+  const seen = new Map();
+
+  candidateRecords.forEach((candidate) => {
+    const existingIndex = seen.get(candidate.dedupeKey);
+    if (existingIndex === undefined) {
+      seen.set(candidate.dedupeKey, deduped.length);
+      deduped.push(candidate);
+      return;
+    }
+
+    if (candidate.specificity > deduped[existingIndex].specificity) {
+      deduped[existingIndex] = candidate;
+    }
+  });
+
+  const buttons = deduped.map((candidate) => candidate.record).slice(0, 80);
 
   return {
     pageTitle: document.title || "Untitled page",
