@@ -17,6 +17,9 @@ const elements = {
   saveAllButton: document.getElementById("saveAllButton"),
   saveCurrentButton: document.getElementById("saveCurrentButton"),
   clearLibraryButton: document.getElementById("clearLibraryButton"),
+  archivePrevButton: document.getElementById("archivePrevButton"),
+  archiveNextButton: document.getElementById("archiveNextButton"),
+  archiveCountBadge: document.getElementById("archiveCountBadge"),
   savedContextMenu: document.getElementById("savedContextMenu"),
   savedContextDeleteButton: document.getElementById("savedContextDeleteButton"),
   capturePrevButton: document.getElementById("capturePrevButton"),
@@ -47,6 +50,7 @@ const elements = {
   savedDetailsCss: document.getElementById("savedDetailsCss"),
   savedEmpty: document.getElementById("savedEmpty"),
   savedLibrary: document.getElementById("savedLibrary"),
+  savedPreview: document.getElementById("savedPreview"),
   savedDetails: document.getElementById("savedDetails"),
   savedDetailsTitle: document.getElementById("savedDetailsTitle"),
   savedDetailsFont: document.getElementById("savedDetailsFont"),
@@ -75,6 +79,11 @@ function bindEvents() {
   elements.clearLibraryButton.addEventListener("click", handleClearLibrary);
   elements.capturePrevButton.addEventListener("click", () => moveDetected(-1));
   elements.captureNextButton.addEventListener("click", () => moveDetected(1));
+  elements.archivePrevButton.addEventListener("click", () => moveSaved(-1));
+  elements.archiveNextButton.addEventListener("click", () => moveSaved(1));
+  elements.savedPreview.addEventListener("click", handleSavedPreviewClick);
+  elements.savedPreview.addEventListener("keydown", handleSavedPreviewKeyDown);
+  elements.savedPreview.addEventListener("contextmenu", handleSavedPreviewContextMenu);
   elements.removeSavedButton.addEventListener("click", handleRemoveSelectedSaved);
   elements.copySavedCssButton.addEventListener("click", handleCopySavedCss);
   elements.copyMarkupButton.addEventListener("click", handleCopyMarkup);
@@ -186,17 +195,18 @@ function renderInspector(item) {
 }
 
 function renderSavedLibrary() {
-  elements.savedLibrary.innerHTML = "";
   elements.savedEmpty.hidden = state.savedButtons.length > 0;
   elements.savedLibrary.hidden = state.savedButtons.length === 0;
   elements.savedDetails.hidden = state.savedButtons.length === 0;
-  if (state.savedButtons.length === 0) {
-    hideSavedContextMenu();
-  }
   elements.copySavedCssButton.disabled = state.savedButtons.length === 0;
+  elements.archivePrevButton.disabled = state.savedButtons.length <= 1;
+  elements.archiveNextButton.disabled = state.savedButtons.length <= 1;
 
   if (state.savedButtons.length === 0) {
+    hideSavedContextMenu();
     state.selectedSavedId = null;
+    elements.archiveCountBadge.textContent = "0 saved";
+    elements.savedPreview.replaceChildren();
     return;
   }
 
@@ -204,48 +214,10 @@ function renderSavedLibrary() {
     state.selectedSavedId = state.savedButtons[0].id;
   }
 
-  const fragment = document.createDocumentFragment();
-
-  state.savedButtons.forEach((item) => {
-    const wrapper = document.createElement("div");
-    wrapper.className = "saved-button-wrap";
-
-    const previewButton = document.createElement("div");
-    previewButton.className = "saved-button";
-    if (item.id === state.selectedSavedId) {
-      previewButton.classList.add("is-active");
-    }
-    previewButton.setAttribute("role", "button");
-    previewButton.tabIndex = 0;
-    previewButton.dataset.savedId = item.id;
-    renderSavedButtonSurface(previewButton, item);
-    previewButton.addEventListener("click", () => {
-      hideSavedContextMenu();
-      state.selectedSavedId = item.id;
-      renderSavedLibrary();
-    });
-    previewButton.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        hideSavedContextMenu();
-        state.selectedSavedId = item.id;
-        renderSavedLibrary();
-      }
-    });
-    previewButton.addEventListener("contextmenu", (event) => {
-      event.preventDefault();
-      state.selectedSavedId = item.id;
-      renderSavedLibrary();
-      showSavedContextMenu(event.clientX, event.clientY, item.id);
-    });
-
-    wrapper.append(previewButton);
-    fragment.appendChild(wrapper);
-  });
-
-  elements.savedLibrary.appendChild(fragment);
-
-  const selectedItem = state.savedButtons.find((item) => item.id === state.selectedSavedId) || state.savedButtons[0];
+  const selectedIndex = state.savedButtons.findIndex((item) => item.id === state.selectedSavedId);
+  const selectedItem = state.savedButtons[selectedIndex] || state.savedButtons[0];
+  elements.archiveCountBadge.textContent = `${selectedIndex + 1} / ${state.savedButtons.length}`;
+  renderSavedButtonSurface(elements.savedPreview, selectedItem, true);
   renderSavedDetails(selectedItem);
 }
 
@@ -279,18 +251,18 @@ function renderPreviewSurface(item) {
   elements.inspectorPreview.replaceChildren(fallback);
 }
 
-function renderSavedButtonSurface(container, item) {
+function renderSavedButtonSurface(container, item, fitToStage = false) {
   if (item.previewHtml) {
     container.innerHTML = item.previewHtml;
     const root = container.firstElementChild;
     if (root) {
-      root.style.maxWidth = "100%";
+      root.style.maxWidth = "none";
       root.style.minWidth = "0";
       root.style.boxSizing = "border-box";
       root.style.margin = "0";
-      root.style.flexShrink = "1";
-      if (item.width > 260) {
-        root.style.width = "100%";
+      root.style.flexShrink = "0";
+      if (fitToStage) {
+        fitSavedPreviewToStage(container, root, item);
       }
     }
     return;
@@ -300,13 +272,78 @@ function renderSavedButtonSurface(container, item) {
   fallback.type = "button";
   fallback.textContent = item.label || "Button";
   applyPreviewStyle(fallback, item.styles, item.width, item.height);
-  fallback.style.maxWidth = "100%";
+  fallback.style.maxWidth = "none";
   fallback.style.minWidth = "0";
   fallback.style.margin = "0";
-  if (item.width > 260) {
-    fallback.style.width = "100%";
+  if (fitToStage) {
+    container.replaceChildren(fallback);
+    fitSavedPreviewToStage(container, fallback, item);
+    return;
   }
   container.replaceChildren(fallback);
+}
+
+function fitSavedPreviewToStage(container, root, item) {
+  const naturalWidth = Math.max(1, Math.round(item.width || root.getBoundingClientRect().width || 1));
+  const naturalHeight = Math.max(1, Math.round(item.height || root.getBoundingClientRect().height || 1));
+  const availableWidth = Math.max(120, container.clientWidth - 8);
+  const scale = Math.min(1, availableWidth / naturalWidth);
+
+  root.style.width = `${naturalWidth}px`;
+  root.style.transform = `scale(${scale})`;
+  root.style.transformOrigin = "center center";
+  root.style.display = root.style.display || "inline-flex";
+  container.style.minHeight = `${Math.max(48, Math.round(naturalHeight * scale))}px`;
+}
+
+function moveSaved(direction) {
+  if (state.savedButtons.length <= 1) {
+    return;
+  }
+
+  const currentIndex = state.savedButtons.findIndex((item) => item.id === state.selectedSavedId);
+  const safeIndex = currentIndex === -1 ? 0 : currentIndex;
+  const lastIndex = state.savedButtons.length - 1;
+  const nextIndex = direction > 0
+    ? (safeIndex === lastIndex ? 0 : safeIndex + 1)
+    : (safeIndex === 0 ? lastIndex : safeIndex - 1);
+
+  hideSavedContextMenu();
+  state.selectedSavedId = state.savedButtons[nextIndex].id;
+  renderSavedLibrary();
+}
+
+function handleSavedPreviewClick() {
+  hideSavedContextMenu();
+}
+
+function handleSavedPreviewKeyDown(event) {
+  if (event.key === "ArrowLeft") {
+    event.preventDefault();
+    moveSaved(-1);
+    return;
+  }
+
+  if (event.key === "ArrowRight") {
+    event.preventDefault();
+    moveSaved(1);
+    return;
+  }
+
+  if (event.key === "ContextMenu") {
+    event.preventDefault();
+    showSavedContextMenu(window.innerWidth / 2, window.innerHeight / 2, state.selectedSavedId);
+  }
+}
+
+function handleSavedPreviewContextMenu(event) {
+  if (!state.selectedSavedId) {
+    return;
+  }
+
+  event.preventDefault();
+  elements.savedPreview.blur();
+  showSavedContextMenu(event.clientX, event.clientY, state.selectedSavedId);
 }
 
 function moveDetected(direction) {
@@ -455,7 +492,7 @@ function handleGlobalPointerDown(event) {
 }
 
 function handleGlobalContextMenu(event) {
-  if (!event.target.closest(".saved-button")) {
+  if (!event.target.closest("#savedPreview") && !event.target.closest(".saved-button")) {
     hideSavedContextMenu();
   }
 }

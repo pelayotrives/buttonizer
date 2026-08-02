@@ -129,14 +129,23 @@
       <section class="panel">
         <div class="panel-header">
           <h2>Archive</h2>
-          <button id="clearLibraryButton" class="ui-button ui-button--ghost" type="button">Clear library</button>
+          <div class="panel-header__controls">
+            <div class="capture-nav">
+              <button id="archivePrevButton" class="nav-button" type="button" aria-label="Previous saved button">‹</button>
+              <span id="archiveCountBadge" class="counter-pill">0 saved</span>
+              <button id="archiveNextButton" class="nav-button" type="button" aria-label="Next saved button">›</button>
+            </div>
+            <button id="clearLibraryButton" class="ui-button ui-button--ghost" type="button">Clear library</button>
+          </div>
         </div>
 
         <div id="savedEmpty" class="empty-state">
           <p>Your saved buttons stay here between sessions.</p>
         </div>
 
-        <div id="savedLibrary" class="saved-library" hidden></div>
+        <div id="savedLibrary" class="preview-stage saved-preview-stage" hidden>
+          <div id="savedPreview" class="preview-stage__surface" aria-hidden="true"></div>
+        </div>
 
         <div id="savedDetails" class="saved-details" hidden>
           <div class="saved-details__header">
