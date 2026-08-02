@@ -851,10 +851,26 @@ function normalizeFontFamily(fontFamily) {
     "-apple-system",
   ]);
 
-  return String(fontFamily || "Arial, sans-serif")
+  const families = String(fontFamily || "Arial, sans-serif")
     .split(",")
     .map((part) => part.trim().replace(/^[;\s"']+/, "").replace(/[;\s"']+$/, ""))
     .filter(Boolean)
+    .filter((part) => !/\bfallback\b/i.test(part));
+
+  const uniqueFamilies = [];
+  const seen = new Set();
+
+  families.forEach((part) => {
+    const normalized = part.toLowerCase();
+    if (seen.has(normalized)) {
+      return;
+    }
+
+    seen.add(normalized);
+    uniqueFamilies.push(part);
+  });
+
+  return uniqueFamilies
     .map((part) => (genericFamilies.has(part.toLowerCase()) || /^[a-z-]+$/i.test(part) ? part : `"${part}"`))
     .join(", ");
 }
@@ -867,11 +883,8 @@ function toKebabCase(value) {
 }
 
 function compactFontFamily(fontFamily) {
-  return String(fontFamily || "Unknown font")
-    .split(",")[0]
-    .replace(/^[;\s"']+/, "")
-    .replace(/[;\s"']+$/, "")
-    .trim();
+  const normalized = normalizeFontFamily(fontFamily);
+  return normalized.split(",")[0]?.replace(/^[\s"']+/, "").replace(/[\s"']+$/, "").trim() || "Unknown font";
 }
 
 function formatBorder(styles) {
@@ -1007,13 +1020,41 @@ function scanCurrentPageButtons() {
     return score;
   }
 
-  function isLowValueButton(node, label, rect) {
+  function parseAlpha(colorValue) {
+    if (!colorValue || colorValue === "transparent") {
+      return 0;
+    }
+
+    const rgbaMatch = colorValue.match(/rgba?\(([^)]+)\)/i);
+    if (!rgbaMatch) {
+      return colorValue === "transparent" ? 0 : 1;
+    }
+
+    const channels = rgbaMatch[1].split(",").map((part) => part.trim());
+    return channels.length >= 4 ? Number(channels[3]) || 0 : 1;
+  }
+
+  function hasVisualChrome(style) {
+    const hasBackground = parseAlpha(style.backgroundColor) > 0 || (style.backgroundImage && style.backgroundImage !== "none");
+    const hasBorder =
+      style.borderStyle &&
+      style.borderStyle !== "none" &&
+      style.borderStyle !== "hidden" &&
+      parseFloat(style.borderWidth || "0") > 0 &&
+      parseAlpha(style.borderColor) > 0;
+    const hasShadow = Boolean(style.boxShadow && style.boxShadow !== "none");
+
+    return hasBackground || hasBorder || hasShadow;
+  }
+
+  function isLowValueButton(node, label, rect, computedStyle) {
     const normalized = normalizeButtonLabel(label);
     const hasGraphic = Boolean(node.querySelector("svg, img"));
     const looksTiny = rect.width <= 60 && rect.height <= 60;
     const looksUtilitySized = rect.width <= 88 && rect.height <= 72;
     const textLength = normalized.replace(/[^a-z0-9]/gi, "").length;
     const symbolOnly = normalized.length <= 1 && !/[a-z0-9]/i.test(normalized);
+    const hasChrome = hasVisualChrome(computedStyle);
     const disposable = [
       "close",
       "cerrar",
@@ -1025,6 +1066,11 @@ function scanCurrentPageButtons() {
       "cancel",
       "skip",
       "dismiss ad",
+      "menu",
+      "open menu",
+      "more",
+      "more options",
+      "search",
       "x",
     ].includes(normalized);
 
@@ -1034,7 +1080,10 @@ function scanCurrentPageButtons() {
     if (symbolOnly && looksTiny) return true;
     if (disposable && looksUtilitySized) return true;
     if (textLength <= 2 && looksTiny && !hasGraphic) return true;
+    if (hasGraphic && textLength <= 3 && !hasChrome) return true;
+    if (!hasChrome && textLength <= 2) return true;
     if (node.disabled && looksUtilitySized) return true;
+    if (node.getAttribute("role") === "button" && !hasChrome && textLength <= 8) return true;
     return false;
   }
 
@@ -1073,7 +1122,7 @@ function scanCurrentPageButtons() {
         computedStyle.visibility !== "hidden" &&
         computedStyle.display !== "none" &&
         computedStyle.opacity !== "0" &&
-        !isLowValueButton(node, label, rect)
+        !isLowValueButton(node, label, rect, computedStyle)
       );
     })
     .slice(0, 120);
