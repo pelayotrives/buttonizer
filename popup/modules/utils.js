@@ -420,5 +420,5 @@ export function escapeHtml(value) {
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll("\"", "&quot;")
-    .replaceAll(String.fromCharCode(39), "&#39;");
+    .replaceAll(String.fromCodePoint(39), "&#39;");
 }

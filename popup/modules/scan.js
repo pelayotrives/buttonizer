@@ -1,4 +1,3 @@
-export function scanCurrentPageButtons() {
   const selector = "button, input[type='button'], input[type='submit'], input[type='reset'], [role='button']";
   const utilityLabels = new Set([
     "back", "cancel", "cerrar", "clear", "close", "delete", "dismiss", "forward",
@@ -215,7 +214,30 @@ export function scanCurrentPageButtons() {
     });
   }
 
-  function collectFontFaceCss(fontFamily) {
+ function collectShadowRoots(root, roots) {
+  root.querySelectorAll("*").forEach((element) => {
+    if (!element.shadowRoot) return;
+    roots.push(element.shadowRoot);
+    collectShadowRoots(element.shadowRoot, roots);
+  });
+}
+
+function inspectFontRules(rules, baseUrl, requestedFamilies, fontRules) {
+  Array.from(rules).forEach((rule) => {
+    if (rule.type === CSSRule.FONT_FACE_RULE) {
+      const family = normalizeFamilyName(rule.style.getPropertyValue("font-family"));
+      if (requestedFamilies.has(family)) fontRules.push(resolveCssUrls(rule.cssText, baseUrl));
+      return;
+    }
+    if (rule.type === CSSRule.IMPORT_RULE && rule.styleSheet) {
+      inspectFontRules(rule.styleSheet.cssRules, rule.href || baseUrl, requestedFamilies, fontRules);
+    } else if (rule.cssRules) {
+      inspectFontRules(rule.cssRules, baseUrl, requestedFamilies, fontRules);
+    }
+  });
+}
+
+function collectFontFaceCss(fontFamily) {
     const cacheKey = String(fontFamily || "");
     if (fontFaceCache.has(cacheKey)) return fontFaceCache.get(cacheKey);
 
@@ -229,15 +251,8 @@ export function scanCurrentPageButtons() {
 
     const roots = [document];
 
-    function collectShadowRoots(root) {
-      root.querySelectorAll("*").forEach((element) => {
-        if (!element.shadowRoot) return;
-        roots.push(element.shadowRoot);
-        collectShadowRoots(element.shadowRoot);
-      });
-    }
 
-    collectShadowRoots(document);
+    collectShadowRoots(document, roots);
 
     const sheets = new Set();
     roots.forEach((root) => {
@@ -254,29 +269,11 @@ export function scanCurrentPageButtons() {
     const fontRules = [];
     const visitedSheets = new Set();
 
-    function inspectRules(rules, baseUrl) {
-      Array.from(rules).forEach((rule) => {
-        if (rule.type === CSSRule.FONT_FACE_RULE) {
-          const family = normalizeFamilyName(rule.style.getPropertyValue("font-family"));
-          if (requestedFamilies.has(family)) {
-            fontRules.push(resolveCssUrls(rule.cssText, baseUrl));
-          }
-          return;
-        }
-
-        if (rule.type === CSSRule.IMPORT_RULE && rule.styleSheet) {
-          inspectRules(rule.styleSheet.cssRules, rule.href || baseUrl);
-        } else if (rule.cssRules) {
-          inspectRules(rule.cssRules, baseUrl);
-        }
-      });
-    }
-
     sheets.forEach((sheet) => {
       if (visitedSheets.has(sheet)) return;
       visitedSheets.add(sheet);
       try {
-        inspectRules(sheet.cssRules, sheet.href || document.baseURI);
+        inspectFontRules(sheet.cssRules, sheet.href || document.baseURI, requestedFamilies, fontRules);
       } catch {
         // Cross-origin stylesheets remain represented by their computed styles.
       }
@@ -287,6 +284,7 @@ export function scanCurrentPageButtons() {
     return cssText;
   }
 
+function scanCurrentPageButtons() {
   const candidates = [...new Set(collectCandidates(document))].map((node, index) => {
     const rect = node.getBoundingClientRect();
     const style = window.getComputedStyle(node);
@@ -335,4 +333,13 @@ export function scanCurrentPageButtons() {
     pageUrl: window.location.href,
     buttons: Array.from(records.values(), ({ record }) => record).slice(0, 80),
   };
+
+}
+
+if (!globalThis.__buttonizerScanListener) {
+  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message?.type !== "buttonizer:scan") return;
+    sendResponse(scanCurrentPageButtons());
+  });
+  globalThis.__buttonizerScanListener = true;
 }

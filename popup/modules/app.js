@@ -10,7 +10,6 @@ import {
   normalizeButtonRecord,
   renderPalette,
 } from "./utils.js";
-import { scanCurrentPageButtons } from "./scan.js";
 
 export function startApp() {
   bootstrap().catch((error) => {
@@ -307,12 +306,16 @@ async function handleScanPage() {
       throw new Error("No active tab available.");
     }
 
-    const injection = await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      func: scanCurrentPageButtons,
-    });
-
-    const result = injection[0]?.result || null;
+    let result;
+    try {
+      result = await chrome.tabs.sendMessage(tab.id, { type: "buttonizer:scan" });
+    } catch {
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ["popup/modules/scan.js"],
+      });
+      result = await chrome.tabs.sendMessage(tab.id, { type: "buttonizer:scan" });
+    }
     if (!result) {
       throw new Error("No scan result returned.");
     }
