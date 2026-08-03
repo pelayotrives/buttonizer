@@ -30,6 +30,7 @@ function bindEvents() {
   elements.saveAllButton.addEventListener("click", handleSaveAll);
   elements.saveCurrentButton.addEventListener("click", handleSaveCurrent);
   elements.clearLibraryButton.addEventListener("click", handleClearLibrary);
+  elements.exportArchiveButton.addEventListener("click", handleExportArchive);
   elements.capturePrevButton.addEventListener("click", () => moveDetected(-1));
   elements.captureNextButton.addEventListener("click", () => moveDetected(1));
   elements.archivePrevButton.addEventListener("click", () => moveSaved(-1));
@@ -103,6 +104,7 @@ function renderAll() {
   renderSavedLibrary();
   elements.saveAllButton.disabled = state.detectedButtons.length === 0;
   elements.clearLibraryButton.disabled = state.savedButtons.length === 0;
+  elements.exportArchiveButton.disabled = state.savedButtons.length === 0;
 }
 
 function renderPageFacts() {
@@ -399,6 +401,52 @@ async function handleRemoveSelectedSaved() {
   }
 
   await removeSavedItem(state.selectedSavedId);
+}
+
+function createArchiveExport() {
+  return {
+    schemaVersion: 1,
+    exportedAt: new Date().toISOString(),
+    buttons: state.savedButtons.map((item) => ({
+      id: item.id,
+      label: item.label,
+      html: item.outerHtml,
+      css: buildCssSnippet(item),
+      source: {
+        pageTitle: item.pageTitle,
+        pageUrl: item.pageUrl,
+        hostname: item.hostname,
+        selector: item.selector,
+      },
+      dimensions: { width: item.width, height: item.height },
+      palette: item.palette,
+    })),
+  };
+}
+
+function downloadArchiveJson(payload) {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "buttonizer_archive_" + timestamp + ".json";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function handleExportArchive() {
+  if (state.savedButtons.length === 0) {
+    setStatus("The archive is empty.", "Error");
+    showToast("Nothing to export.");
+    return;
+  }
+
+  downloadArchiveJson(createArchiveExport());
+  setStatus("Archive exported.", "Ready");
+  showToast("Archive exported.");
 }
 
 async function handleCopySavedCss() {

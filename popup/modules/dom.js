@@ -17,6 +17,7 @@ export const elements = {
   saveAllButton: document.getElementById("saveAllButton"),
   saveCurrentButton: document.getElementById("saveCurrentButton"),
   clearLibraryButton: document.getElementById("clearLibraryButton"),
+  exportArchiveButton: document.getElementById("exportArchiveButton"),
   archivePrevButton: document.getElementById("archivePrevButton"),
   archiveNextButton: document.getElementById("archiveNextButton"),
   archiveCountBadge: document.getElementById("archiveCountBadge"),
