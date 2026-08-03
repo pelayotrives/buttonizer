@@ -27,30 +27,48 @@ export function renderPalette(container, palette, onCopyColor) {
   });
 }
 
-export function colorToHex(colorValue) {
-  const context = document.createElement("canvas").getContext("2d");
-  if (!context) {
-    return colorValue;
-  }
+function parseColorChannel(value) {
+  const numeric = Number.parseFloat(value);
+  if (!Number.isFinite(numeric)) return 0;
+  const channel = value.trim().endsWith("%") ? numeric * 2.55 : numeric;
+  return Math.round(Math.max(0, Math.min(255, channel)));
+}
 
+function parseRgbColor(value) {
+  const open = value.indexOf("(");
+  const close = value.lastIndexOf(")");
+  if (open === -1 || close <= open) return null;
+  const channels = value.slice(open + 1, close).replaceAll("/", " ").split(/[,\s]+/).filter(Boolean);
+  if (channels.length < 3) return null;
+  return channels.slice(0, 3).map(parseColorChannel);
+}
+
+function resolveColorForConversion(colorValue, context) {
   context.fillStyle = "#000000";
   context.fillStyle = colorValue;
-  const normalized = context.fillStyle;
+  const canvasColor = context.fillStyle;
+  if (canvasColor !== "#000000" || String(colorValue).trim().toLowerCase() === "#000000") return canvasColor;
 
+  const probe = document.createElement("span");
+  probe.style.color = colorValue;
+  if (!probe.style.color) return canvasColor;
+  document.body.appendChild(probe);
+  const resolved = window.getComputedStyle(probe).color;
+  probe.remove();
+  return resolved;
+}
+
+export function colorToHex(colorValue) {
+  const context = document.createElement("canvas").getContext("2d");
+  if (!context) return "#000000";
+  const normalized = resolveColorForConversion(String(colorValue || ""), context);
   if (normalized.startsWith("#")) {
-    return normalized.toUpperCase();
+    const hex = normalized.slice(1);
+    if (hex.length === 3 || hex.length === 6) return ("#" + hex).toUpperCase();
   }
-
-  const rgbMatch = normalized.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
-  if (!rgbMatch) {
-    return colorValue;
-  }
-
-  const [, r, g, b] = rgbMatch;
-  return `#${[r, g, b]
-    .map((value) => Number(value).toString(16).padStart(2, "0"))
-    .join("")
-    .toUpperCase()}`;
+  const channels = parseRgbColor(normalized);
+  if (!channels) return "#000000";
+  return "#" + channels.map((channel) => channel.toString(16).padStart(2, "0")).join("").toUpperCase();
 }
 
 export function normalizeButtonRecord(item) {
