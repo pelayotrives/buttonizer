@@ -17,7 +17,7 @@
       <section class="workspace-panel">
         <header class="workspace-panel__hero">
           <div class="workspace-panel__copy">
-            <h1>Capture and keep useful buttons</h1>
+            <h1>Buttonizer</h1>
             <p class="hero-copy">
               Scan the current page, isolate the button components you like, and keep them in your own private archive with their visual details.
             </p>
@@ -28,7 +28,7 @@
           </div>
         </header>
 
-        <p id="statusMessage" class="status-banner" role="status">Ready to inspect the active tab.</p>
+        <output id="statusMessage" class="status-banner">Ready to inspect the active tab.</output>
 
         <div id="pageFacts" class="facts-grid">
           <div class="fact-card">
@@ -62,7 +62,7 @@
           <article id="detectedInspector" class="inspector-card" hidden>
             <div class="inspector-card__header">
               <div class="inspector-card__title-wrap">
-                <h3 id="inspectorTitle"></h3>
+                <h3 id="inspectorTitle">&nbsp;</h3>
                 <p id="inspectorSubtitle" class="inspector-card__subtitle"></p>
               </div>
               <button id="saveCurrentButton" class="ui-button ui-button--mini ui-button--secondary" type="button">Save</button>
@@ -149,7 +149,7 @@
 
         <div id="savedDetails" class="saved-details" hidden>
           <div class="saved-details__header">
-            <h3 id="savedDetailsTitle"></h3>
+            <h3 id="savedDetailsTitle">&nbsp;</h3>
             <div class="saved-details__actions">
               <button id="removeSavedButton" class="ui-button ui-button--mini ui-button--secondary" type="button">Remove</button>
             </div>
