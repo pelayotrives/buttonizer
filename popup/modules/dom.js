@@ -60,4 +60,5 @@ export const elements = {
   savedDetailsBorder: document.getElementById("savedDetailsBorder"),
   savedDetailsShadow: document.getElementById("savedDetailsShadow"),
   savedDetailsPalette: document.getElementById("savedDetailsPalette"),
+  appVersion: document.getElementById("appVersion"),
 };

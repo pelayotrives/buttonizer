@@ -22,7 +22,13 @@ export function startApp() {
 async function bootstrap() {
   bindEvents();
   await loadSavedButtons();
+  renderVersion();
   renderAll();
+}
+
+function renderVersion() {
+  const manifest = chrome.runtime.getManifest();
+  elements.appVersion.textContent = "Version " + manifest.version;
 }
 
 function bindEvents() {
