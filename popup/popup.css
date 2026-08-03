@@ -655,6 +655,7 @@ h3 {
 }
 
 .snippet-block__value--code {
+  color: #ffffff;
   overflow: auto;
   max-height: 160px;
   margin-top: 0;
