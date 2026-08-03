@@ -127,15 +127,43 @@ export function formatDomainLabel(pageUrl) {
   }
 }
 
+function parseCssDeclaration(line) {
+  if (!line.endsWith(";")) return null;
+
+  let propertyStart = 0;
+  while (propertyStart < line.length && isCssWhitespace(line[propertyStart])) propertyStart += 1;
+  let propertyEnd = propertyStart;
+  while (propertyEnd < line.length && isCssPropertyCharacter(line[propertyEnd])) propertyEnd += 1;
+  if (propertyEnd === propertyStart || line[propertyEnd] !== ":") return null;
+
+  let valueStart = propertyEnd + 1;
+  while (valueStart < line.length - 1 && isCssWhitespace(line[valueStart])) valueStart += 1;
+  return {
+    indent: line.slice(0, propertyStart),
+    property: line.slice(propertyStart, propertyEnd),
+    colon: line.slice(propertyEnd, valueStart),
+    value: line.slice(valueStart, -1),
+    semicolon: ";",
+  };
+}
+
+function isCssWhitespace(character) {
+  return character === " " || character === "\t";
+}
+
+function isCssPropertyCharacter(character) {
+  return (character >= "a" && character <= "z") || character === "-";
+}
+
 export function highlightCssSnippet(source) {
   const lines = escapeHtml(source).split("\n");
   const highlightedLines = lines.map((line) => {
-    const declaration = line.match(/^([ \t]*)([a-z-]+)(:[ \t]*)([^;\n]*)(;)$/);
+    const declaration = parseCssDeclaration(line);
     if (!declaration) {
       return line;
     }
 
-    const [, indent, property, colon, value, semicolon] = declaration;
+    const { indent, property, colon, value, semicolon } = declaration;
     return indent +
       '<span class="token token-property">' + property + '</span>' +
       colon + '<span class="token token-value">' + value + '</span>' +
@@ -237,66 +265,60 @@ function highlightHtmlTag(rawTag) {
     '<span class="token token-punctuation">' + close + '</span>';
 }
 
+function skipHtmlWhitespace(source, index) {
+  while (index < source.length && isHtmlWhitespace(source[index])) index += 1;
+  return index;
+}
+
+function isHtmlWhitespace(character) {
+  return character === " " || character === "\t" || character === "\n" || character === "\r" || character === "\f";
+}
+
+function readHtmlAttributeName(source, index) {
+  const start = index;
+  while (index < source.length && !isHtmlWhitespace(source[index]) && source[index] !== "=") index += 1;
+  return { value: source.slice(start, index), end: index };
+}
+
+function readHtmlAttributeValue(source, index) {
+  const quote = source.codePointAt(index);
+  const isQuoted = quote === 34 || quote === 39;
+  const start = index;
+  if (isQuoted) {
+    index += 1;
+    while (index < source.length && source.codePointAt(index) !== quote) index += 1;
+    if (index < source.length) index += 1;
+  } else {
+    while (index < source.length && !isHtmlWhitespace(source[index])) index += 1;
+  }
+  return { value: source.slice(start, index), end: index };
+}
+
 function highlightHtmlAttributes(source) {
   const parts = [];
   let index = 0;
 
   while (index < source.length) {
-    const whitespaceStart = index;
-    while (index < source.length && /\s/.test(source[index])) {
-      index += 1;
-    }
-    if (index > whitespaceStart) {
-      parts.push(escapeHtml(source.slice(whitespaceStart, index)));
-    }
-    if (index >= source.length) {
-      break;
-    }
+    const whitespaceEnd = skipHtmlWhitespace(source, index);
+    if (whitespaceEnd > index) parts.push(escapeHtml(source.slice(index, whitespaceEnd)));
+    index = whitespaceEnd;
+    if (index >= source.length) break;
 
-    const nameStart = index;
-    while (index < source.length && !/[\s=]/.test(source[index])) {
-      index += 1;
-    }
-    const name = source.slice(nameStart, index);
-    if (!name) {
+    const name = readHtmlAttributeName(source, index);
+    if (!name.value) {
       parts.push(escapeHtml(source[index]));
       index += 1;
       continue;
     }
+    parts.push("<span class=\"token token-attribute\">" + escapeHtml(name.value) + "</span>");
+    index = skipHtmlWhitespace(source, name.end);
+    if (source[index] !== "=") continue;
 
-    parts.push('<span class="token token-attribute">' + escapeHtml(name) + '</span>');
-
-    while (index < source.length && /\s/.test(source[index])) {
-      index += 1;
-    }
-    if (source[index] !== "=") {
-      continue;
-    }
-
-    parts.push('<span class="token token-punctuation">=</span>');
-    index += 1;
-    while (index < source.length && /\s/.test(source[index])) {
-      index += 1;
-    }
-
-    const quote = source[index] === '"' || source[index] === "'" ? source[index] : "";
-    const valueStart = index;
-    if (quote) {
-      index += 1;
-      while (index < source.length && source[index] !== quote) {
-        index += 1;
-      }
-      if (index < source.length) {
-        index += 1;
-      }
-    } else {
-      while (index < source.length && !/\s/.test(source[index])) {
-        index += 1;
-      }
-    }
-
-    parts.push('<span class="token token-string">' +
-      escapeHtml(source.slice(valueStart, index)) + '</span>');
+    parts.push("<span class=\"token token-punctuation\">=</span>");
+    index = skipHtmlWhitespace(source, index + 1);
+    const value = readHtmlAttributeValue(source, index);
+    parts.push("<span class=\"token token-string\">" + escapeHtml(value.value) + "</span>");
+    index = value.end;
   }
 
   return parts.join("");
@@ -382,12 +404,19 @@ function formatFamilyToken(part, genericFamilies) {
   return "\"" + part + "\"";
 }
 
+function trimHyphenEdges(value) {
+  let start = 0;
+  let end = value.length;
+  while (start < end && value[start] === "-") start += 1;
+  while (end > start && value[end - 1] === "-") end -= 1;
+  return value.slice(start, end);
+}
+
 export function toKebabCase(value) {
-  return String(value || "button")
+  const kebab = String(value || "button")
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+/, "")
-    .replace(/-+$/, "") || "button";
+    .replace(/[^a-z0-9]+/g, "-");
+  return trimHyphenEdges(kebab) || "button";
 }
 
 function stripWrappingQuotes(value) {
