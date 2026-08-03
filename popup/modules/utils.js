@@ -129,8 +129,7 @@ export function highlightCssSnippet(source) {
   let html = escapeHtml(source);
 
   html = html.replace(/(\.[a-z0-9-]+)(\s*\{)/gi, '<span class="token token-selector">$1</span>$2');
-  html = html.replace(/(^|
-)(\s*)([a-z-]+)(:\s*)([^;]+)(;)/g, (_match, lineStart, indent, property, colon, value, semicolon) => {
+  html = html.replace(/(^|\n)(\s*)([a-z-]+)(:\s*)([^;]+)(;)/g, (_match, lineStart, indent, property, colon, value, semicolon) => {
     return `${lineStart}${indent}<span class="token token-property">${property}</span>${colon}<span class="token token-value">${value}</span><span class="token token-punctuation">${semicolon}</span>`;
   });
   html = html.replace(/[{}]/g, '<span class="token token-punctuation">$&</span>');
@@ -231,11 +230,8 @@ export function buildCssSnippet(item) {
     ["padding", item.styles.padding || "10px 16px"],
   ];
 
-  const body = rules.map(([property, value]) => `  ${property}: ${value};`).join("
-");
-  return `${selectorName} {
-${body}
-}`;
+  const body = rules.map(([property, value]) => `  ${property}: ${value};`).join("\n");
+  return `${selectorName} {\n${body}\n}`;
 }
 
 export function normalizeFontFamily(fontFamily) {
