@@ -1,5 +1,5 @@
 export function renderPalette(container, palette, onCopyColor) {
-  container.innerHTML = "";
+  container.replaceChildren();
   const uniqueColors = [...new Set(palette.filter(isVisibleColor))].slice(0, 6);
 
   if (uniqueColors.length === 0) {
@@ -17,10 +17,10 @@ export function renderPalette(container, palette, onCopyColor) {
     swatch.style.background = colorValue;
     swatch.title = `Copy ${colorValue}`;
     swatch.setAttribute("aria-label", `Copy color ${colorValue}`);
-    swatch.addEventListener("click", async () => {
+    swatch.addEventListener("click", () => {
       const hexValue = colorToHex(colorValue);
       if (onCopyColor) {
-        await onCopyColor(hexValue);
+        Promise.resolve(onCopyColor(hexValue)).catch(() => {});
       }
     });
     container.appendChild(swatch);
@@ -128,33 +128,45 @@ export function formatDomainLabel(pageUrl) {
 }
 
 export function highlightCssSnippet(source) {
-  let html = escapeHtml(source);
+  const lines = escapeHtml(source).split("\n");
+  const highlightedLines = lines.map((line) => {
+    const declaration = line.match(/^([ \t]*)([a-z-]+)(:[ \t]*)([^;\n]*)(;)$/);
+    if (!declaration) {
+      return line;
+    }
 
-  html = html.replace(/(\.[a-z0-9-]+)(\s*\{)/gi, '<span class="token token-selector">$1</span>$2');
-  html = html.replace(/(^|\n)(\s*)([a-z-]+)(:\s*)([^;]+)(;)/g, (_match, lineStart, indent, property, colon, value, semicolon) => {
-    return `${lineStart}${indent}<span class="token token-property">${property}</span>${colon}<span class="token token-value">${value}</span><span class="token token-punctuation">${semicolon}</span>`;
+    const [, indent, property, colon, value, semicolon] = declaration;
+    return indent +
+      '<span class="token token-property">' + property + '</span>' +
+      colon + '<span class="token token-value">' + value + '</span>' +
+      '<span class="token token-punctuation">' + semicolon + '</span>';
   });
-  html = html.replace(/[{}]/g, '<span class="token token-punctuation">$&</span>');
 
-  return html;
+  return highlightedLines
+    .join("\n")
+    .replace(/[{}]/g, '<span class="token token-punctuation">$&</span>');
 }
 
 export function highlightHtmlSnippet(source) {
   const input = String(source || "");
-  const tagPattern = /<[^>]+>/g;
   let lastIndex = 0;
   let result = "";
+  let tagStart = input.indexOf("<");
 
-  for (const match of input.matchAll(tagPattern)) {
-    const [rawTag] = match;
-    const matchIndex = match.index || 0;
-
-    if (matchIndex > lastIndex) {
-      result += escapeHtml(input.slice(lastIndex, matchIndex));
+  while (tagStart !== -1) {
+    const tagEnd = findTagEnd(input, tagStart);
+    if (tagEnd === -1) {
+      break;
     }
 
+    if (tagStart > lastIndex) {
+      result += escapeHtml(input.slice(lastIndex, tagStart));
+    }
+
+    const rawTag = input.slice(tagStart, tagEnd + 1);
     result += highlightHtmlTag(rawTag);
-    lastIndex = matchIndex + rawTag.length;
+    lastIndex = tagEnd + 1;
+    tagStart = input.indexOf("<", lastIndex);
   }
 
   if (lastIndex < input.length) {
@@ -164,55 +176,127 @@ export function highlightHtmlSnippet(source) {
   return result;
 }
 
+function findTagEnd(source, startIndex) {
+  let quote = "";
+  for (let index = startIndex + 1; index < source.length; index += 1) {
+    const character = source[index];
+    if (quote) {
+      if (character === quote) {
+        quote = "";
+      }
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      quote = character;
+      continue;
+    }
+    if (character === ">") {
+      return index;
+    }
+  }
+  return -1;
+}
+
+function readTagName(rawTag, startIndex) {
+  let index = startIndex;
+  while (index < rawTag.length && /\s/.test(rawTag[index])) {
+    index += 1;
+  }
+
+  const nameStart = index;
+  while (index < rawTag.length && !/[\s/>]/.test(rawTag[index])) {
+    index += 1;
+  }
+
+  return {
+    name: rawTag.slice(nameStart, index) || "div",
+    end: index,
+  };
+}
+
 function highlightHtmlTag(rawTag) {
-  const isClosing = /^<\//.test(rawTag);
-  const isSelfClosing = /\/>$/.test(rawTag);
-  const tagNameMatch = rawTag.match(/^<\/?\s*([a-z0-9-]+)/i);
-  const tagName = tagNameMatch ? tagNameMatch[1] : "div";
+  const isClosing = rawTag.startsWith("</");
+  const isSelfClosing = rawTag.endsWith("/>");
+  const tagInfo = readTagName(rawTag, isClosing ? 2 : 1);
   const open = isClosing ? "&lt;/" : "&lt;";
   const close = isSelfClosing ? "/&gt;" : "&gt;";
 
   if (isClosing) {
-    return `<span class="token token-punctuation">${open}</span><span class="token token-tag">${escapeHtml(tagName)}</span><span class="token token-punctuation">&gt;</span>`;
+    return '<span class="token token-punctuation">' + open +
+      '</span><span class="token token-tag">' + escapeHtml(tagInfo.name) +
+      '</span><span class="token token-punctuation">&gt;</span>';
   }
 
-  const attrSource = rawTag
-    .replace(/^<\s*[a-z0-9-]+/i, "")
-    .replace(/\/?\s*>$/, "")
-    .trim();
+  const closingLength = isSelfClosing ? 2 : 1;
+  const attrSource = rawTag.slice(tagInfo.end, rawTag.length - closingLength).trim();
+  const highlightedAttrs = attrSource ? " " + highlightHtmlAttributes(attrSource) : "";
 
-  const highlightedAttrs = attrSource ? ` ${highlightHtmlAttributes(attrSource)}` : "";
-
-  return `<span class="token token-punctuation">${open}</span><span class="token token-tag">${escapeHtml(tagName)}</span>${highlightedAttrs}<span class="token token-punctuation">${close}</span>`;
+  return '<span class="token token-punctuation">' + open +
+    '</span><span class="token token-tag">' + escapeHtml(tagInfo.name) +
+    '</span>' + highlightedAttrs +
+    '<span class="token token-punctuation">' + close + '</span>';
 }
 
 function highlightHtmlAttributes(source) {
-  const attrPattern = /([:@a-zA-Z0-9_-]+)(\s*=\s*("[^"]*"|'[^']*'|[^\s"'=<>`]+))?/g;
   const parts = [];
-  let lastIndex = 0;
+  let index = 0;
 
-  for (const match of source.matchAll(attrPattern)) {
-    const [rawAttr, name, assignment = ""] = match;
-    const matchIndex = match.index || 0;
-
-    if (matchIndex > lastIndex) {
-      parts.push(escapeHtml(source.slice(lastIndex, matchIndex)));
+  while (index < source.length) {
+    const whitespaceStart = index;
+    while (index < source.length && /\s/.test(source[index])) {
+      index += 1;
+    }
+    if (index > whitespaceStart) {
+      parts.push(escapeHtml(source.slice(whitespaceStart, index)));
+    }
+    if (index >= source.length) {
+      break;
     }
 
-    let rendered = `<span class="token token-attribute">${escapeHtml(name)}</span>`;
-
-    if (assignment) {
-      const eqIndex = assignment.indexOf("=");
-      const value = assignment.slice(eqIndex + 1).trim();
-      rendered += `<span class="token token-punctuation">=</span><span class="token token-string">${escapeHtml(value)}</span>`;
+    const nameStart = index;
+    while (index < source.length && !/[\s=]/.test(source[index])) {
+      index += 1;
+    }
+    const name = source.slice(nameStart, index);
+    if (!name) {
+      parts.push(escapeHtml(source[index]));
+      index += 1;
+      continue;
     }
 
-    parts.push(rendered);
-    lastIndex = matchIndex + rawAttr.length;
-  }
+    parts.push('<span class="token token-attribute">' + escapeHtml(name) + '</span>');
 
-  if (lastIndex < source.length) {
-    parts.push(escapeHtml(source.slice(lastIndex)));
+    while (index < source.length && /\s/.test(source[index])) {
+      index += 1;
+    }
+    if (source[index] !== "=") {
+      continue;
+    }
+
+    parts.push('<span class="token token-punctuation">=</span>');
+    index += 1;
+    while (index < source.length && /\s/.test(source[index])) {
+      index += 1;
+    }
+
+    const quote = source[index] === '"' || source[index] === "'" ? source[index] : "";
+    const valueStart = index;
+    if (quote) {
+      index += 1;
+      while (index < source.length && source[index] !== quote) {
+        index += 1;
+      }
+      if (index < source.length) {
+        index += 1;
+      }
+    } else {
+      while (index < source.length && !/\s/.test(source[index])) {
+        index += 1;
+      }
+    }
+
+    parts.push('<span class="token token-string">' +
+      escapeHtml(source.slice(valueStart, index)) + '</span>');
   }
 
   return parts.join("");
@@ -262,17 +346,13 @@ export function normalizeFontFamily(fontFamily) {
     "-apple-system",
   ]);
 
-  const raw = String(fontFamily || "Arial, sans-serif").replace(/;/g, "");
+  const raw = String(fontFamily || "Arial, sans-serif").replaceAll(";", "");
   const tokens = raw.match(/"[^"]+"|'[^']+'|[^,]+/g) || [];
   const uniqueFamilies = [];
   const seen = new Set();
 
   tokens.forEach((token) => {
-    const cleaned = String(token)
-      .replace(/;/g, "")
-      .replace(/^[\s"']+/, "")
-      .replace(/[\s"']+$/, "")
-      .trim();
+    const cleaned = stripWrappingQuotes(String(token).replaceAll(";", ""));
 
     if (!cleaned || /\bfallback\b/i.test(cleaned)) {
       return;
@@ -288,22 +368,42 @@ export function normalizeFontFamily(fontFamily) {
   });
 
   return uniqueFamilies
-    .map((part) => (genericFamilies.has(part.toLowerCase()) || /^[a-z-]+$/i.test(part) ? part : `"${part}"`))
+    .map((part) => formatFamilyToken(part, genericFamilies))
     .join(", ")
-    .replace(/"\s*;/g, '"')
     .trim();
+}
+
+function formatFamilyToken(part, genericFamilies) {
+  const isGenericFamily = genericFamilies.has(part.toLowerCase());
+  const isUnquotedFamily = /^[a-z-]+$/i.test(part);
+  if (isGenericFamily || isUnquotedFamily) {
+    return part;
+  }
+  return "\"" + part + "\"";
 }
 
 export function toKebabCase(value) {
   return String(value || "button")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "") || "button";
+    .replace(/^-+/, "")
+    .replace(/-+$/, "") || "button";
+}
+
+function stripWrappingQuotes(value) {
+  const trimmed = value.trim();
+  const hasDoubleQuotes = trimmed.codePointAt(0) === 34 && trimmed.codePointAt(trimmed.length - 1) === 34;
+  const hasSingleQuotes = trimmed.codePointAt(0) === 39 && trimmed.codePointAt(trimmed.length - 1) === 39;
+  if (hasDoubleQuotes || hasSingleQuotes) {
+    return trimmed.slice(1, -1).trim();
+  }
+  return trimmed;
 }
 
 export function compactFontFamily(fontFamily) {
   const normalized = normalizeFontFamily(fontFamily);
-  return normalized.split(",")[0]?.replace(/^[\s"']+/, "").replace(/[\s"']+$/, "").trim() || "Unknown font";
+  const firstFamily = normalized.split(",")[0] || "";
+  return stripWrappingQuotes(firstFamily) || "Unknown font";
 }
 
 export function formatBorder(styles) {
@@ -316,9 +416,9 @@ export function isVisibleColor(value) {
 
 export function escapeHtml(value) {
   return String(value)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll("\"", "&quot;")
+    .replaceAll(String.fromCharCode(39), "&#39;");
 }

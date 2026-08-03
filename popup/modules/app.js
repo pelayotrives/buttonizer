@@ -3,7 +3,6 @@ import { renderPreviewSurface, renderSavedButtonSurface } from "./preview.js";
 import {
   buildCssSnippet,
   compactFontFamily,
-  escapeHtml,
   formatBorder,
   formatDomainLabel,
   highlightCssSnippet,
@@ -102,16 +101,29 @@ function renderPageFacts() {
     { label: "Domain", value: state.pageUrl },
   ];
 
-  elements.pageFacts.innerHTML = facts
-    .map(
-      (fact) => `
-        <div class="fact-card">
-          <span class="fact-card__label">${escapeHtml(fact.label)}</span>
-          <p class="fact-card__value">${escapeHtml(fact.value)}</p>
-        </div>
-      `
-    )
-    .join("");
+  elements.pageFacts.replaceChildren(...facts.map(createFactCard));
+}
+
+function createFactCard(fact) {
+  const card = document.createElement("div");
+  card.className = "fact-card";
+
+  const label = document.createElement("span");
+  label.className = "fact-card__label";
+  label.textContent = fact.label;
+
+  const value = document.createElement("p");
+  value.className = "fact-card__value";
+  value.textContent = fact.value;
+
+  card.append(label, value);
+  return card;
+}
+
+function renderHighlightedContent(container, source) {
+  const parsed = new DOMParser().parseFromString(source, "text/html");
+  const nodes = Array.from(parsed.body.childNodes).map((node) => document.importNode(node, true));
+  container.replaceChildren(...nodes);
 }
 
 function renderCaptureInspector() {
@@ -145,7 +157,7 @@ function renderInspector(item) {
   elements.inspectorRadius.textContent = item.styles.borderRadius || "0px";
   elements.inspectorShadow.textContent = item.styles.boxShadow || "None";
   elements.inspectorSelector.textContent = item.selector || "No selector available";
-  elements.inspectorMarkup.innerHTML = highlightHtmlSnippet(item.outerHtml || "<button></button>");
+  renderHighlightedContent(elements.inspectorMarkup, highlightHtmlSnippet(item.outerHtml || "<button></button>"));
   renderPalette(elements.inspectorPalette, item.palette || [], handlePaletteCopy);
 }
 
@@ -189,7 +201,7 @@ function renderSavedDetails(item) {
   elements.savedDetailsBackground.textContent = `Background: ${item.styles.backgroundColor || "Transparent"}`;
   elements.savedDetailsBorder.textContent = `Border: ${formatBorder(item.styles)}`;
   elements.savedDetailsShadow.textContent = `Shadow: ${item.styles.boxShadow || "None"}`;
-  elements.savedDetailsCss.innerHTML = highlightCssSnippet(buildCssSnippet(item));
+  renderHighlightedContent(elements.savedDetailsCss, highlightCssSnippet(buildCssSnippet(item)));
   renderPalette(elements.savedDetailsPalette, item.palette || [], handlePaletteCopy);
 }
 
@@ -201,13 +213,25 @@ function moveSaved(direction) {
   const currentIndex = state.savedButtons.findIndex((item) => item.id === state.selectedSavedId);
   const safeIndex = currentIndex === -1 ? 0 : currentIndex;
   const lastIndex = state.savedButtons.length - 1;
-  const nextIndex = direction > 0
-    ? (safeIndex === lastIndex ? 0 : safeIndex + 1)
-    : (safeIndex === 0 ? lastIndex : safeIndex - 1);
+  const nextIndex = getCircularSavedIndex(safeIndex, lastIndex, direction);
 
   hideSavedContextMenu();
   state.selectedSavedId = state.savedButtons[nextIndex].id;
   renderSavedLibrary();
+}
+
+function getCircularSavedIndex(currentIndex, lastIndex, direction) {
+  if (direction > 0) {
+    if (currentIndex === lastIndex) {
+      return 0;
+    }
+    return currentIndex + 1;
+  }
+
+  if (currentIndex === 0) {
+    return lastIndex;
+  }
+  return currentIndex - 1;
 }
 
 function handleSavedPreviewClick() {
@@ -258,6 +282,21 @@ function moveDetected(direction) {
   renderCaptureInspector();
 }
 
+function getScanStatusMessage(count) {
+  if (count === 0) {
+    return "Scan complete. No visible button-like components were detected.";
+  }
+  const noun = count === 1 ? "button" : "buttons";
+  return `Scan complete. ${count} ${noun} captured.`;
+}
+
+function getScanToastMessage(count) {
+  if (count === 0) {
+    return "Scan complete.";
+  }
+  return `${count} buttons captured.`;
+}
+
 async function handleScanPage() {
   try {
     setStatus("Scanning visible buttons on the current page...", "Scanning");
@@ -273,7 +312,7 @@ async function handleScanPage() {
       func: scanCurrentPageButtons,
     });
 
-    const result = injection[0] && injection[0].result ? injection[0].result : null;
+    const result = injection[0]?.result || null;
     if (!result) {
       throw new Error("No scan result returned.");
     }
@@ -284,13 +323,11 @@ async function handleScanPage() {
     state.detectedIndex = 0;
 
     const count = state.detectedButtons.length;
-    const message = count === 0
-      ? "Scan complete. No visible button-like components were detected."
-      : `Scan complete. ${count} button reference${count === 1 ? "" : "s"} captured.`;
+    const message = getScanStatusMessage(count);
 
     setStatus(message, "Ready");
     renderAll();
-    showToast(count === 0 ? "Scan complete." : `${count} buttons captured.`);
+    showToast(getScanToastMessage(count));
   } catch (error) {
     console.error(error);
     setStatus(error.message || "Scan failed.", "Error");

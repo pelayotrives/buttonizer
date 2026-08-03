@@ -258,7 +258,6 @@ h3 {
 .saved-details__meta p,
 .snippet-block__value {
   overflow-wrap: anywhere;
-  word-break: break-word;
 }
 
 .capture-panel,
@@ -324,15 +323,7 @@ h3 {
     background var(--dur-mid) var(--ease-in-out),
     color var(--dur-mid) var(--ease-in-out),
     opacity var(--dur-fast) var(--ease-out);
-}
-
-.ui-button,
-.nav-button,
-.saved-button,
-.saved-button__remove,
-.icon-button,
-.palette-swatch {
-  cursor: pointer;
+    cursor: pointer;
 }
 
 .ui-button,
@@ -590,12 +581,11 @@ h3 {
   background:
     linear-gradient(90deg, rgba(0, 122, 204, 0.18) 0 3px, transparent 3px),
     #1e1e1e;
-  color: #d4d4d4;
   font-family: Consolas, "Cascadia Code", "SFMono-Regular", Menlo, monospace;
   font-size: 11px;
   line-height: 1.6;
   white-space: pre-wrap;
-  word-break: break-word;
+  overflow-wrap: break-word;
   tab-size: 2;
 }
 
