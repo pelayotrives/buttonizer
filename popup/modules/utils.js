@@ -96,6 +96,7 @@ export function normalizeButtonRecord(item) {
       minHeight: item.styles?.minHeight || "",
       width: item.styles?.width || "auto",
       height: item.styles?.height || "auto",
+      boxSizing: item.styles?.boxSizing || "border-box",
       letterSpacing: item.styles?.letterSpacing || "normal",
       textTransform: item.styles?.textTransform || "none",
     },
@@ -222,12 +223,20 @@ export function buildCssSnippet(item) {
     ["font-family", normalizeFontFamily(item.styles.fontFamily)],
     ["font-size", item.styles.fontSize || "14px"],
     ["font-weight", item.styles.fontWeight || "400"],
+    ["line-height", item.styles.lineHeight || "normal"],
     ["color", item.styles.color || "inherit"],
-    ["background-color", item.styles.backgroundColor || "transparent"],
+    ["background", item.styles.background || item.styles.backgroundColor || "transparent"],
     ["border", formatBorder(item.styles)],
     ["border-radius", item.styles.borderRadius || "0px"],
     ["box-shadow", item.styles.boxShadow || "none"],
     ["padding", item.styles.padding || "10px 16px"],
+    ["box-sizing", item.styles.boxSizing || "border-box"],
+    ["display", item.styles.display || "inline-flex"],
+    ["align-items", item.styles.alignItems || "center"],
+    ["justify-content", item.styles.justifyContent || "center"],
+    ["gap", item.styles.gap || "0px"],
+    ["letter-spacing", item.styles.letterSpacing || "normal"],
+    ["text-transform", item.styles.textTransform || "none"],
   ];
 
   const body = rules.map(([property, value]) => `  ${property}: ${value};`).join("\n");
@@ -264,7 +273,7 @@ export function normalizeFontFamily(fontFamily) {
       .replace(/[\s"']+$/, "")
       .trim();
 
-    if (!cleaned || /fallback/i.test(cleaned)) {
+    if (!cleaned || /\bfallback\b/i.test(cleaned)) {
       return;
     }
 
@@ -297,7 +306,7 @@ export function compactFontFamily(fontFamily) {
 }
 
 export function formatBorder(styles) {
-  return `${styles.borderWidth || "0px"} ${styles.borderStyle || "solid"} ${styles.borderColor || "transparent"}`;
+  return styles.border || `${styles.borderWidth || "0px"} ${styles.borderStyle || "solid"} ${styles.borderColor || "transparent"}`;
 }
 
 export function isVisibleColor(value) {

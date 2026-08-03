@@ -50,7 +50,9 @@ function bindEvents() {
 
 async function loadSavedButtons() {
   const result = await chrome.storage.local.get(STORAGE_KEY);
-  state.savedButtons = Array.isArray(result[STORAGE_KEY]) ? result[STORAGE_KEY] : [];
+  state.savedButtons = Array.isArray(result[STORAGE_KEY])
+    ? result[STORAGE_KEY].map(normalizeButtonRecord)
+    : [];
   state.selectedSavedId = state.savedButtons[0]?.id || null;
 }
 

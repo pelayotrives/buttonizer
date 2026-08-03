@@ -47,11 +47,8 @@ export function renderSavedButtonSurface(container, item, fitToStage = false) {
 }
 
 export function preparePreviewNode(root) {
-  root.style.maxWidth = "none";
-  root.style.minWidth = "0";
-  root.style.boxSizing = "border-box";
-  root.style.margin = "0";
-  root.style.flexShrink = "0";
+  root.style.pointerEvents = "none";
+  root.style.userSelect = "none";
 }
 
 export function fitPreviewToStage(container, root, item) {
@@ -63,12 +60,8 @@ export function fitPreviewToStage(container, root, item) {
     const availableHeight = Math.max(56, (container.clientHeight || naturalHeight) - 16);
     const scale = Math.min(1, availableWidth / naturalWidth, availableHeight / naturalHeight);
 
-    root.style.width = `${naturalWidth}px`;
-    root.style.maxWidth = "none";
-    root.style.transform = `scale(${scale})`;
-    root.style.transformOrigin = "center center";
-    root.style.display = root.style.display && root.style.display !== "inline" ? root.style.display : "inline-flex";
-    root.style.alignSelf = "center";
+    // CSS zoom changes layout dimensions without replacing the captured component styles.
+    root.style.zoom = String(scale);
     container.style.minHeight = `${Math.max(64, Math.round(naturalHeight * scale) + 8)}px`;
     container.scrollLeft = 0;
     container.scrollTop = 0;
@@ -101,6 +94,7 @@ export function applyPreviewStyle(node, styles, width = 0, height = 0) {
   node.style.minHeight = styles.minHeight || (height ? `${Math.round(height)}px` : "auto");
   node.style.width = styles.width && styles.width !== "auto" ? styles.width : "auto";
   node.style.height = styles.height && styles.height !== "auto" ? styles.height : "auto";
+  node.style.boxSizing = styles.boxSizing || "border-box";
   node.style.letterSpacing = styles.letterSpacing || "normal";
   node.style.textTransform = styles.textTransform || "none";
 }
