@@ -9,6 +9,7 @@ export const state = {
   detectedIndex: 0,
   selectedSavedId: null,
   toastTimer: null,
+  scanLoaderTimer: null,
   contextMenuId: null,
 };
 
@@ -29,6 +30,7 @@ export const elements = {
   copyMarkupButton: document.getElementById("copyMarkupButton"),
   statusMessage: document.getElementById("statusMessage"),
   toastMessage: document.getElementById("toastMessage"),
+  scanLoader: document.getElementById("scanLoader"),
   scanCountBadge: document.getElementById("scanCountBadge"),
   pageFacts: document.getElementById("pageFacts"),
   detectedEmpty: document.getElementById("detectedEmpty"),

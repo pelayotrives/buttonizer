@@ -10,6 +10,14 @@
     <main class="app-shell">
       <div id="toastMessage" class="toast" hidden aria-live="polite"></div>
 
+      <output id="scanLoader" class="scan-loader" hidden aria-live="polite" aria-hidden="true">
+        <div class="scan-loader__card">
+          <div class="scan-loader__spinner" aria-hidden="true"></div>
+          <p class="scan-loader__title">Reading the page</p>
+          <p class="scan-loader__copy">Finding visible button components</p>
+        </div>
+      </output>
+
       <div id="savedContextMenu" class="context-menu" hidden>
         <button id="savedContextDeleteButton" class="context-menu__item" type="button">Delete</button>
       </div>

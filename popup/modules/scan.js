@@ -1,4 +1,4 @@
-  const selector = "button, input[type='button'], input[type='submit'], input[type='reset'], [role='button']";
+  const selector = "button, input[type='button'], input[type='submit'], input[type='reset'], [role='button'], a";
   const utilityLabels = new Set([
     "back", "cancel", "cerrar", "clear", "close", "delete", "dismiss", "forward",
     "menu", "more", "more options", "next", "open menu", "previous", "remove", "search",
@@ -70,7 +70,7 @@
   }
 
   function isNestedDuplicate(node) {
-    const isNative = node.localName === "button" || node instanceof HTMLInputElement;
+    const isNative = node.localName === "button" || node.localName === "a" || node instanceof HTMLInputElement;
     if (isNative) return false;
 
     if (
@@ -186,7 +186,7 @@
   }
 
   function quality(node, style) {
-    return (node.localName === "button" ? 6 : 0) +
+    return (node.localName === "button" ? 6 : node.localName === "a" ? 4 : 0) +
       (node instanceof HTMLInputElement ? 5 : 0) + (hasVisualChrome(style) ? 3 : 0) +
       (node.id ? 2 : 0) + Math.min(2, node.classList.length);
   }

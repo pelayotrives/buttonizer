@@ -4,7 +4,7 @@
   "version": "0.0.1",
   "description": "Scan the current page for buttons, inspect their visual styles, and save them to a private local library.",
   "action": {
-    "default_popup": "popup.html",
+    "default_popup": "popup/popup.html",
     "default_title": "Buttonizer",
     "default_icon": {
       "16": "icons/icon-16.png",
