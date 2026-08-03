@@ -197,6 +197,96 @@ export function scanCurrentPageButtons() {
     return boxShadow.match(/(rgba?\([^)]+\)|#[0-9a-fA-F]{3,8})/)?.[0] || "";
   }
 
+  const fontFaceCache = new Map();
+
+  function normalizeFamilyName(value) {
+    return String(value || "").replace(/[;"']/g, "").trim().toLocaleLowerCase();
+  }
+
+  function resolveCssUrls(cssText, baseUrl) {
+    return cssText.replace(/url\((['"]?)(.*?)\1\)/gi, (match, _quote, value) => {
+      const source = value.trim();
+      if (!source || /^(data:|blob:|#)/i.test(source)) return match;
+      try {
+        return `url("${new URL(source, baseUrl || document.baseURI).href}")`;
+      } catch {
+        return match;
+      }
+    });
+  }
+
+  function collectFontFaceCss(fontFamily) {
+    const cacheKey = String(fontFamily || "");
+    if (fontFaceCache.has(cacheKey)) return fontFaceCache.get(cacheKey);
+
+    const requestedFamilies = new Set(
+      String(fontFamily || "")
+        .split(",")
+        .map(normalizeFamilyName)
+        .filter(Boolean)
+    );
+    if (requestedFamilies.size === 0) return "";
+
+    const roots = [document];
+
+    function collectShadowRoots(root) {
+      root.querySelectorAll("*").forEach((element) => {
+        if (!element.shadowRoot) return;
+        roots.push(element.shadowRoot);
+        collectShadowRoots(element.shadowRoot);
+      });
+    }
+
+    collectShadowRoots(document);
+
+    const sheets = new Set();
+    roots.forEach((root) => {
+      if (root === document) {
+        Array.from(document.styleSheets).forEach((sheet) => sheets.add(sheet));
+      } else {
+        Array.from(root.adoptedStyleSheets || []).forEach((sheet) => sheets.add(sheet));
+        root.querySelectorAll("style").forEach((styleElement) => {
+          if (styleElement.sheet) sheets.add(styleElement.sheet);
+        });
+      }
+    });
+
+    const fontRules = [];
+    const visitedSheets = new Set();
+
+    function inspectRules(rules, baseUrl) {
+      Array.from(rules).forEach((rule) => {
+        if (rule.type === CSSRule.FONT_FACE_RULE) {
+          const family = normalizeFamilyName(rule.style.getPropertyValue("font-family"));
+          if (requestedFamilies.has(family)) {
+            fontRules.push(resolveCssUrls(rule.cssText, baseUrl));
+          }
+          return;
+        }
+
+        if (rule.type === CSSRule.IMPORT_RULE && rule.styleSheet) {
+          inspectRules(rule.styleSheet.cssRules, rule.href || baseUrl);
+        } else if (rule.cssRules) {
+          inspectRules(rule.cssRules, baseUrl);
+        }
+      });
+    }
+
+    sheets.forEach((sheet) => {
+      if (visitedSheets.has(sheet)) return;
+      visitedSheets.add(sheet);
+      try {
+        inspectRules(sheet.cssRules, sheet.href || document.baseURI);
+      } catch {
+        // Cross-origin stylesheets remain represented by their computed styles.
+      }
+    });
+
+    const cssText = [...new Set(fontRules)].slice(0, 8).join("\n");
+    fontFaceCache.set(cacheKey, cssText);
+    return cssText;
+  }
+
   const candidates = [...new Set(collectCandidates(document))].map((node, index) => {
     const rect = node.getBoundingClientRect();
     const style = window.getComputedStyle(node);
@@ -217,6 +307,7 @@ export function scanCurrentPageButtons() {
         selector: buildSelector(node),
         outerHtml: node.outerHTML.slice(0, 4000),
         previewHtml: cloneStyled(node)?.outerHTML || node.outerHTML,
+        fontFaceCss: collectFontFaceCss(style.fontFamily),
         width: rect.width,
         height: rect.height,
         palette: [style.backgroundColor, style.color, style.borderColor, shadowColor(style.boxShadow)],

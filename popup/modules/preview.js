@@ -1,7 +1,35 @@
+const loadedFontFaces = new Set();
+
+function ensureFontFaces(cssText) {
+  if (!cssText || loadedFontFaces.has(cssText)) return;
+  const style = document.createElement("style");
+  style.dataset.buttonizerFont = "true";
+  style.textContent = cssText;
+  document.head.appendChild(style);
+  loadedFontFaces.add(cssText);
+}
+
+function mountPreviewHtml(container, html) {
+  const previewDocument = new DOMParser().parseFromString(html, "text/html");
+  previewDocument.querySelectorAll("script, iframe, object, embed, link, style").forEach((node) => node.remove());
+  previewDocument.querySelectorAll("*").forEach((node) => {
+    Array.from(node.attributes).forEach((attribute) => {
+      const name = attribute.name.toLowerCase();
+      const value = attribute.value.trim();
+      if (name.startsWith("on") || name === "srcdoc" || (/^(href|src|action|formaction)$/.test(name) && /^javascript:/i.test(value))) {
+        node.removeAttribute(attribute.name);
+      }
+    });
+  });
+  const root = previewDocument.body.firstElementChild;
+  container.replaceChildren(root ? document.importNode(root, true) : document.createTextNode(""));
+  return container.firstElementChild;
+}
+
 export function renderPreviewSurface(container, item, fitToStage = false) {
+  ensureFontFaces(item.fontFaceCss);
   if (item.previewHtml) {
-    container.innerHTML = item.previewHtml;
-    const root = container.firstElementChild;
+    const root = mountPreviewHtml(container, item.previewHtml);
     if (root && fitToStage) {
       preparePreviewNode(root);
       fitPreviewToStage(container, root, item);
@@ -21,9 +49,9 @@ export function renderPreviewSurface(container, item, fitToStage = false) {
 }
 
 export function renderSavedButtonSurface(container, item, fitToStage = false) {
+  ensureFontFaces(item.fontFaceCss);
   if (item.previewHtml) {
-    container.innerHTML = item.previewHtml;
-    const root = container.firstElementChild;
+    const root = mountPreviewHtml(container, item.previewHtml);
     if (root) {
       preparePreviewNode(root);
       if (fitToStage) {

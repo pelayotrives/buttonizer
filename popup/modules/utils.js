@@ -66,6 +66,7 @@ export function normalizeButtonRecord(item) {
     height: Math.round(item.height || 0),
     palette: Array.isArray(item.palette) ? item.palette : [],
     previewHtml: item.previewHtml || "",
+    fontFaceCss: item.fontFaceCss || "",
     styles: {
       fontFamily: item.styles?.fontFamily || "Arial, sans-serif",
       fontSize: item.styles?.fontSize || "14px",
@@ -121,7 +122,7 @@ export function formatDomainLabel(pageUrl) {
   try {
     const url = new URL(pageUrl);
     return `${url.origin}/*`;
-  } catch (error) {
+  } catch {
     return pageUrl;
   }
 }
