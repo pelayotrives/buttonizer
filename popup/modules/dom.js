@@ -9,7 +9,6 @@ export const state = {
   detectedIndex: 0,
   selectedSavedId: null,
   toastTimer: null,
-  scanLoaderTimer: null,
   contextMenuId: null,
 };
 

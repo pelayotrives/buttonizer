@@ -64,6 +64,17 @@ function setStatus(message, status) {
   renderPageFacts();
 }
 
+function setScanLoader(visible) {
+  elements.scanLoader.hidden = !visible;
+  elements.scanLoader.setAttribute("aria-hidden", String(!visible));
+}
+
+function waitForScanMinimumDuration(startedAt) {
+  const remaining = 2500 - (performance.now() - startedAt);
+  if (remaining <= 0) return Promise.resolve();
+  return new Promise((resolve) => window.setTimeout(resolve, remaining));
+}
+
 function showToast(message) {
   if (state.toastTimer) {
     clearTimeout(state.toastTimer);
@@ -300,6 +311,8 @@ async function handleScanPage() {
   try {
     setStatus("Scanning visible buttons on the current page...", "Scanning");
     elements.scanPageButton.disabled = true;
+    const scanStartedAt = performance.now();
+    setScanLoader(true);
 
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab || typeof tab.id !== "number") {
@@ -320,6 +333,8 @@ async function handleScanPage() {
       throw new Error("No scan result returned.");
     }
 
+    await waitForScanMinimumDuration(scanStartedAt);
+
     state.pageTitle = result.pageTitle || "Untitled page";
     state.pageUrl = formatDomainLabel(result.pageUrl);
     state.detectedButtons = result.buttons.map(normalizeButtonRecord);
@@ -336,6 +351,7 @@ async function handleScanPage() {
     setStatus(error.message || "Scan failed.", "Error");
     showToast("Scan failed.");
   } finally {
+    setScanLoader(false);
     elements.scanPageButton.disabled = false;
   }
 }

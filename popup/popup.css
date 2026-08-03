@@ -101,6 +101,61 @@ h3 {
   background: #ffffff;
 }
 
+.scan-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: var(--space-5);
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.scan-loader[hidden] {
+  display: none;
+}
+
+.scan-loader__card {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  width: min(100%, 250px);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-paper);
+  box-shadow: var(--shadow-hover);
+  text-align: center;
+}
+
+.scan-loader__spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--color-soft-strong);
+  border-top-color: var(--color-signal);
+  border-radius: 50%;
+  animation: scan-loader-spin 800ms linear infinite;
+}
+
+.scan-loader__title {
+  margin-top: var(--space-2);
+  font-size: var(--text-md);
+  font-weight: 700;
+}
+
+.scan-loader__copy {
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+}
+
+@keyframes scan-loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .toast {
   position: fixed;
   top: 12px;
