@@ -4,9 +4,9 @@ import {
   buildCssSnippet,
   compactFontFamily,
   formatBorder,
-  formatDomainLabel,
   highlightCssSnippet,
   highlightHtmlSnippet,
+  normalizeMarkup,
   normalizeButtonRecord,
   renderPalette,
 } from "./utils.js";
@@ -43,14 +43,9 @@ function bindEvents() {
   elements.archiveNextButton.addEventListener("click", () => moveSaved(1));
   elements.savedPreview.addEventListener("click", handleSavedPreviewClick);
   elements.savedPreview.addEventListener("keydown", handleSavedPreviewKeyDown);
-  elements.savedPreview.addEventListener("contextmenu", handleSavedPreviewContextMenu);
   elements.removeSavedButton.addEventListener("click", handleRemoveSelectedSaved);
   elements.copySavedCssButton.addEventListener("click", handleCopySavedCss);
   elements.copyMarkupButton.addEventListener("click", handleCopyMarkup);
-  elements.savedContextDeleteButton.addEventListener("click", handleContextDelete);
-  document.addEventListener("click", handleGlobalPointerDown);
-  document.addEventListener("contextmenu", handleGlobalContextMenu);
-  document.addEventListener("keydown", handleGlobalKeyDown);
 }
 
 async function loadSavedButtons() {
@@ -175,7 +170,7 @@ function renderInspector(item) {
   elements.inspectorRadius.textContent = item.styles.borderRadius || "0px";
   elements.inspectorShadow.textContent = item.styles.boxShadow || "None";
   elements.inspectorSelector.textContent = item.selector || "No selector available";
-  renderHighlightedContent(elements.inspectorMarkup, highlightHtmlSnippet(item.outerHtml || "<button></button>"));
+  renderHighlightedContent(elements.inspectorMarkup, highlightHtmlSnippet(normalizeMarkup(item.outerHtml || "<button></button>")));
   renderPalette(elements.inspectorPalette, item.palette || [], handlePaletteCopy);
 }
 
@@ -188,7 +183,6 @@ function renderSavedLibrary() {
   elements.archiveNextButton.disabled = state.savedButtons.length <= 1;
 
   if (state.savedButtons.length === 0) {
-    hideSavedContextMenu();
     state.selectedSavedId = null;
     elements.archiveCountBadge.textContent = "0 saved";
     elements.savedPreview.replaceChildren();
@@ -213,7 +207,6 @@ function renderSavedDetails(item) {
   }
 
   elements.savedDetails.hidden = false;
-  elements.savedContextDeleteButton.disabled = false;
   elements.savedDetailsTitle.textContent = item.label || "Unnamed button";
   elements.savedDetailsFont.textContent = `Font: ${compactFontFamily(item.styles.fontFamily)} · ${item.styles.fontWeight || "400"}`;
   elements.savedDetailsBackground.textContent = `Background: ${item.styles.backgroundColor || "Transparent"}`;
@@ -233,7 +226,6 @@ function moveSaved(direction) {
   const lastIndex = state.savedButtons.length - 1;
   const nextIndex = getCircularSavedIndex(safeIndex, lastIndex, direction);
 
-  hideSavedContextMenu();
   state.selectedSavedId = state.savedButtons[nextIndex].id;
   renderSavedLibrary();
 }
@@ -252,8 +244,22 @@ function getCircularSavedIndex(currentIndex, lastIndex, direction) {
   return currentIndex - 1;
 }
 
-function handleSavedPreviewClick() {
-  hideSavedContextMenu();
+async function handleSavedPreviewClick() {
+  const item = state.savedButtons.find((entry) => entry.id === state.selectedSavedId);
+  if (!item?.pageUrl) {
+    setStatus("This saved button has no source URL.", "Error");
+    return;
+  }
+
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) {
+      throw new Error("No active tab available.");
+    }
+    await chrome.tabs.update(tab.id, { url: item.pageUrl });
+  } catch (error) {
+    setStatus(error.message || "Could not open the source page.", "Error");
+  }
 }
 
 function handleSavedPreviewKeyDown(event) {
@@ -269,20 +275,6 @@ function handleSavedPreviewKeyDown(event) {
     return;
   }
 
-  if (event.key === "ContextMenu") {
-    event.preventDefault();
-    showSavedContextMenu(window.innerWidth / 2, window.innerHeight / 2, state.selectedSavedId);
-  }
-}
-
-function handleSavedPreviewContextMenu(event) {
-  if (!state.selectedSavedId) {
-    return;
-  }
-
-  event.preventDefault();
-  elements.savedPreview.blur();
-  showSavedContextMenu(event.clientX, event.clientY, state.selectedSavedId);
 }
 
 function moveDetected(direction) {
@@ -344,7 +336,7 @@ async function handleScanPage() {
     await waitForScanMinimumDuration(scanStartedAt);
 
     state.pageTitle = result.pageTitle || "Untitled page";
-    state.pageUrl = formatDomainLabel(result.pageUrl);
+    state.pageUrl = result.pageUrl || "Unknown page";
     state.detectedButtons = result.buttons.map(normalizeButtonRecord);
     state.detectedIndex = 0;
 
@@ -462,51 +454,6 @@ async function handleCopySavedCss() {
   }
 
   await copyText(buildCssSnippet(item), "CSS copied.");
-}
-
-async function handleContextDelete() {
-  if (!state.contextMenuId) {
-    return;
-  }
-
-  const targetId = state.contextMenuId;
-  hideSavedContextMenu();
-  await removeSavedItem(targetId);
-}
-
-function showSavedContextMenu(clientX, clientY, id) {
-  state.contextMenuId = id;
-  const menu = elements.savedContextMenu;
-  menu.hidden = false;
-  menu.style.left = `${Math.max(12, Math.min(clientX - 100, window.innerWidth - 148))}px`;
-  menu.style.top = `${Math.max(12, Math.min(clientY - 8, window.innerHeight - 56))}px`;
-}
-
-function hideSavedContextMenu() {
-  state.contextMenuId = null;
-  elements.savedContextMenu.hidden = true;
-}
-
-function handleGlobalPointerDown(event) {
-  if (elements.savedContextMenu.hidden) {
-    return;
-  }
-
-  if (!elements.savedContextMenu.contains(event.target)) {
-    hideSavedContextMenu();
-  }
-}
-
-function handleGlobalContextMenu(event) {
-  if (!event.target.closest("#savedPreview") && !event.target.closest(".saved-button")) {
-    hideSavedContextMenu();
-  }
-}
-
-function handleGlobalKeyDown(event) {
-  if (event.key === "Escape") {
-    hideSavedContextMenu();
-  }
 }
 
 async function removeSavedItem(id) {

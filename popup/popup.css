@@ -775,41 +775,6 @@ h3 {
   outline: none;
 }
 
-.context-menu {
-  position: fixed;
-  z-index: 1200;
-  min-width: 120px;
-  padding: 6px;
-  border: 1px solid rgba(0, 21, 36, 0.12);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 12px 24px rgba(0, 21, 36, 0.14);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-
-.context-menu__item {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  min-height: 30px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--color-ink);
-  font-size: var(--text-sm);
-  font-weight: 700;
-  text-align: left;
-  cursor: pointer;
-}
-
-.context-menu__item:hover,
-.context-menu__item:focus-visible {
-  background: rgba(21, 97, 109, 0.1);
-  outline: none;
-}
-
 .app-footer {
   padding: 0 var(--space-4) var(--space-4);
   color: var(--color-muted);

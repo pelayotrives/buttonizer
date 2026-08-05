@@ -132,17 +132,25 @@ export function buildStableId(item) {
   ].join("|");
 }
 
-export function formatDomainLabel(pageUrl) {
-  if (!pageUrl) {
-    return "Unknown domain";
+export function normalizeMarkup(source) {
+  const input = String(source || "").trim();
+  if (!input) {
+    return "";
   }
 
-  try {
-    const url = new URL(pageUrl);
-    return `${url.origin}/*`;
-  } catch {
-    return pageUrl;
+  const parsed = new DOMParser().parseFromString(input, "text/html");
+  const root = parsed.body.firstElementChild;
+  if (!root) {
+    return input;
   }
+
+  [root, ...root.querySelectorAll("*")].forEach((element) => {
+    Array.from(element.attributes).forEach((attribute) => {
+      element.setAttribute(attribute.name, attribute.value.replace(/\s+/g, " ").trim());
+    });
+  });
+
+  return root.outerHTML.replace(/>\s+</g, "><").replace(/\s{2,}/g, " ").trim();
 }
 
 function parseCssDeclaration(line) {

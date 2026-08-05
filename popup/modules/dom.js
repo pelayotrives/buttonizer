@@ -9,7 +9,6 @@ export const state = {
   detectedIndex: 0,
   selectedSavedId: null,
   toastTimer: null,
-  contextMenuId: null,
 };
 
 export const elements = {
@@ -21,8 +20,6 @@ export const elements = {
   archivePrevButton: document.getElementById("archivePrevButton"),
   archiveNextButton: document.getElementById("archiveNextButton"),
   archiveCountBadge: document.getElementById("archiveCountBadge"),
-  savedContextMenu: document.getElementById("savedContextMenu"),
-  savedContextDeleteButton: document.getElementById("savedContextDeleteButton"),
   capturePrevButton: document.getElementById("capturePrevButton"),
   captureNextButton: document.getElementById("captureNextButton"),
   removeSavedButton: document.getElementById("removeSavedButton"),

@@ -27,6 +27,9 @@ All notable changes to Buttonizer are documented in this file.
 - Scan execution now injects the scanner file and communicates through runtime messages, with retry support when the active tab has no listener yet.
 - Preview rendering sanitizes captured markup, removes executable or external content, applies captured styles, loads captured fonts, and scales large controls to the available stage.
 - Archive controls use `Export` and `Clear` labels, with export disabled when no saved buttons exist.
+- Archive previews now open the exact page URL where the button was captured.
+- Captured markup is normalized before inspection so excessive whitespace does not obscure the source.
+- Archive deletion uses the visible `Remove` action instead of a separate context menu.
 - Popup and manifest remain on version `0.0.1` for the first Chrome Web Store release.
 
 ### Fixed
