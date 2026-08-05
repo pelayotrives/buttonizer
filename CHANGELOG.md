@@ -2,6 +2,15 @@
 
 All notable changes to Buttonizer are documented in this file.
 
+## [0.0.2]
+
+### Changed
+
+- Archive button previews now show a pointer cursor to indicate that they open the captured source page.
+- Better markup validation.
+- Change icons.
+- Bumped the extension version to `0.0.2`.
+
 ## [0.0.1]
 
 ### Added

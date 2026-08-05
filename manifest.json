@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Buttonizer",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Scan the current page for buttons, inspect their visual styles, and save them to a private local library.",
   "action": {
     "default_popup": "popup/popup.html",

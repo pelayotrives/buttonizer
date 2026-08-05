@@ -592,6 +592,7 @@ h3 {
 
 .saved-preview-stage .preview-stage__surface {
   overflow: hidden;
+  cursor: pointer;
 }
 
 .preview-stage__surface > * {
@@ -757,6 +758,7 @@ h3 {
   background: transparent;
   box-shadow: none;
   outline: none;
+  cursor: pointer;
 }
 
 .saved-button:focus,
